@@ -275,7 +275,7 @@ class PoseHighResolutionNet(nn.Module):
 
     def __init__(self, cfg, **kwargs):
         self.inplanes = 64
-        extra = cfg['MODEL']['EXTRA']
+        extra = cfg['MODEL_EXTRA']
         super(PoseHighResolutionNet, self).__init__()
 
         # stem net
@@ -322,7 +322,7 @@ class PoseHighResolutionNet(nn.Module):
 
         self.final_layer = nn.Conv2d(
             in_channels=pre_stage_channels[0],
-            out_channels=cfg['MODEL']['NUM_JOINTS'],
+            out_channels=cfg['NETWORK']['NUM_JOINTS'],
             kernel_size=extra['FINAL_CONV_KERNEL'],
             stride=1,
             padding=1 if extra['FINAL_CONV_KERNEL'] == 3 else 0
@@ -495,7 +495,7 @@ class PoseHighResolutionNet(nn.Module):
 def get_pose_net(cfg, is_train, **kwargs):
     model = PoseHighResolutionNet(cfg, **kwargs)
 
-    if is_train and cfg['MODEL']['INIT_WEIGHTS']:
-        model.init_weights(cfg['MODEL']['PRETRAINED'])
+    if is_train and cfg['NETWORK']['INIT_WEIGHTS']:
+        model.init_weights(cfg['NETWORK']['PRETRAINED'])
 
     return model

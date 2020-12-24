@@ -24,14 +24,12 @@ import models
 import utils
 
 from lib.utils.utils import get_optimizer, save_checkpoint, load_checkpoint
-from lib.core.config import config, update_config, update_dir, get_model_name
+from lib.core.config import config, update_config, update_dir
 
 from lib.models.pose_hrnet import get_pose_net
 from lib.models.multiview_pose_hrnet import get_multiview_pose_net
 from lib.core.loss import JointsMSELoss, LimbLengthLoss, MultiViewConsistencyLoss
 from lib.core.function import validate
-
-
 
 """
 from utils.utils import create_logger
@@ -44,11 +42,6 @@ from multiviews.cameras import camera_to_world_frame
 def parse_args():
     parser = argparse.ArgumentParser(description='Train keypoints network')
     parser.add_argument(
-        '--cfg', help='experiment configure file name', required=True, type=str)
-    args, rest = parser.parse_known_args()
-    update_config(args.cfg)
-
-    parser.add_argument(
         '--frequent',
         help='frequency of logging',
         default=config.PRINT_FREQ,
@@ -58,7 +51,7 @@ def parse_args():
 
     parser.add_argument(
         '--modelDir', help='model directory', type=str, default='')
-    parser.add_argument('--logDir', help='log directory', type=str, default='')
+    parser.add_argument('--logDir', help='log directory', type=str, default='log')
     parser.add_argument(
         '--dataDir', help='data directory', type=str, default='')
     parser.add_argument(
@@ -89,13 +82,10 @@ def main():
 
     # HRNet Model
     pose_hrnet = get_pose_net(config, is_train=True)
-    pose_hrnet.load_state_dict(torch.load(config.MODEL.PRETRAINED), strict=False)
+    pose_hrnet.load_state_dict(torch.load(config.NETWORK.PRETRAINED), strict=False)
     mv_hrnet = get_multiview_pose_net(pose_hrnet, config)
     depth_hrnet = get_pose_net(config, is_train=True)
     print(mv_hrnet)
-
-    # Save Configs
-    shutil.copy2(args.cfg, final_output_dir)
 
     # Multi GPUs Setting
     gpus = [int(i) for i in config.GPUS.split(',')]

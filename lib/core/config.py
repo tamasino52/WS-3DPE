@@ -19,10 +19,10 @@ config = edict()
 config.OUTPUT_DIR = 'output'
 config.LOG_DIR = 'log'
 config.DATA_DIR = ''
-config.BACKBONE_MODEL = 'pose_resnet'
-config.MODEL = 'multiview_pose_resnet'
+config.BACKBONE_MODEL = 'pose_hrnet'
+config.MODEL = 'multiview_pose_hrnet'
 config.GPUS = '0,1'
-config.WORKERS = 8
+config.WORKERS = 24
 config.PRINT_FREQ = 100
 
 # hrnet definition
@@ -37,7 +37,7 @@ config.MODEL_EXTRA.STAGE2.NUM_MODULES = 1
 config.MODEL_EXTRA.STAGE2.NUM_BRANCHES= 2
 config.MODEL_EXTRA.STAGE2.BLOCK = 'BASIC'
 config.MODEL_EXTRA.STAGE2.NUM_BLOCKS = [4, 4]
-config.MODEL_EXTRA.STAGE2.NUM_CHANNELS = [48, 96]
+config.MODEL_EXTRA.STAGE2.NUM_CHANNELS = [32, 64]
 config.MODEL_EXTRA.STAGE2.FUSE_METHOD = 'SUM'
 
 config.MODEL_EXTRA.STAGE3 = edict()
@@ -45,7 +45,7 @@ config.MODEL_EXTRA.STAGE3.NUM_MODULES = 4
 config.MODEL_EXTRA.STAGE3.NUM_BRANCHES = 3
 config.MODEL_EXTRA.STAGE3.BLOCK = 'BASIC'
 config.MODEL_EXTRA.STAGE3.NUM_BLOCKS = [4, 4, 4]
-config.MODEL_EXTRA.STAGE3.NUM_CHANNELS = [48, 96, 192]
+config.MODEL_EXTRA.STAGE3.NUM_CHANNELS = [32, 64, 128]
 config.MODEL_EXTRA.STAGE3.FUSE_METHOD = 'SUM'
 
 config.MODEL_EXTRA.STAGE4 = edict()
@@ -53,7 +53,7 @@ config.MODEL_EXTRA.STAGE4.NUM_MODULES = 3
 config.MODEL_EXTRA.STAGE4.NUM_BRANCHES = 4
 config.MODEL_EXTRA.STAGE4.BLOCK = 'BASIC'
 config.MODEL_EXTRA.STAGE4.NUM_BLOCKS = [4, 4, 4, 4]
-config.MODEL_EXTRA.STAGE4.NUM_CHANNELS = [48, 96, 192, 384]
+config.MODEL_EXTRA.STAGE4.NUM_CHANNELS = [32, 64, 128, 256]
 config.MODEL_EXTRA.STAGE4.FUSE_METHOD = 'SUM'
 
 
@@ -65,14 +65,16 @@ config.CUDNN.ENABLED = True
 
 # common params for NETWORK
 config.NETWORK = edict()
-config.NETWORK.PRETRAINED = 'models/pytorch/imagenet/resnet50-19c8e357.pth'
-config.NETWORK.NUM_JOINTS = 20
-config.NETWORK.HEATMAP_SIZE = np.array([80, 80])
-config.NETWORK.IMAGE_SIZE = np.array([320, 320])
+config.NETWORK.INIT_WEIGHTS = True
+config.NETWORK.PRETRAINED = '/home/cvlab/repo/WS-3DPE/pose_hrnet_w32_256x256.pth'
+config.NETWORK.NUM_JOINTS = 16
+config.NETWORK.HEATMAP_SIZE = np.array([64, 64])
+config.NETWORK.IMAGE_SIZE = np.array([256, 256])
 config.NETWORK.SIGMA = 2
 config.NETWORK.TARGET_TYPE = 'gaussian'
 config.NETWORK.AGGRE = True
 
+"""
 # pose_resnet related params
 config.POSE_RESNET = edict()
 config.POSE_RESNET.NUM_LAYERS = 50
@@ -81,30 +83,31 @@ config.POSE_RESNET.NUM_DECONV_LAYERS = 3
 config.POSE_RESNET.NUM_DECONV_FILTERS = [256, 256, 256]
 config.POSE_RESNET.NUM_DECONV_KERNELS = [4, 4, 4]
 config.POSE_RESNET.FINAL_CONV_KERNEL = 1
+"""
 
 config.LOSS = edict()
 config.LOSS.USE_TARGET_WEIGHT = True
 
 # DATASET related params
 config.DATASET = edict()
-config.DATASET.ROOT = '../data/h36m/'
+config.DATASET.ROOT = '/home/cvlab/hdd_ext/Dataset/Human36M'
 config.DATASET.TRAIN_DATASET = 'mixed_dataset'
 config.DATASET.TEST_DATASET = 'multi_view_h36m'
 config.DATASET.TRAIN_SUBSET = 'train'
-config.DATASET.TEST_SUBSET = 'validation'
+config.DATASET.TEST_SUBSET = 'valid'
 config.DATASET.ROOTIDX = 0
 config.DATASET.DATA_FORMAT = 'jpg'
 config.DATASET.BBOX = 2000
 config.DATASET.CROP = True
 
 # training data augmentation
-config.DATASET.SCALE_FACTOR = 0
-config.DATASET.ROT_FACTOR = 0
+config.DATASET.SCALE_FACTOR = 0.25
+config.DATASET.ROT_FACTOR = 30
 
 # train
 config.TRAIN = edict()
 config.TRAIN.LR_FACTOR = 0.1
-config.TRAIN.LR_STEP = [90, 110]
+config.TRAIN.LR_STEP = [170, 200]
 config.TRAIN.LR = 0.001
 
 config.TRAIN.OPTIMIZER = 'adam'
@@ -115,19 +118,19 @@ config.TRAIN.GAMMA1 = 0.99
 config.TRAIN.GAMMA2 = 0.0
 
 config.TRAIN.BEGIN_EPOCH = 0
-config.TRAIN.END_EPOCH = 140
+config.TRAIN.END_EPOCH = 210
 
 config.TRAIN.RESUME = False
 
-config.TRAIN.BATCH_SIZE = 8
+config.TRAIN.BATCH_SIZE = 32
 config.TRAIN.SHUFFLE = True
 
 # testing
 config.TEST = edict()
-config.TEST.BATCH_SIZE = 8
+config.TEST.BATCH_SIZE = 32
 config.TEST.STATE = ''
-config.TEST.POST_PROCESS = False
-config.TEST.SHIFT_HEATMAP = False
+config.TEST.POST_PROCESS = True
+config.TEST.SHIFT_HEATMAP = True
 config.TEST.USE_GT_BBOX = False
 config.TEST.IMAGE_THRE = 0.1
 config.TEST.NMS_THRE = 0.6

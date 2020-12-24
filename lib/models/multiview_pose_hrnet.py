@@ -71,24 +71,24 @@ class Aggregation(nn.Module):
 
 class MultiViewPose(nn.Module):
 
-    def __init__(self, PoseResNet, Aggre, CFG):
+    def __init__(self, PoseHRNet, Aggre, CFG):
         super(MultiViewPose, self).__init__()
         self.config = CFG
-        self.resnet = PoseResNet
+        self.hrnet = PoseHRNet
         self.aggre_layer = Aggre
 
     def forward(self, views):
         if isinstance(views, list):
             single_views = []
             for view in views:
-                heatmaps = self.resnet(view)
+                heatmaps = self.hrnet(view)
                 single_views.append(heatmaps)
             multi_views = []
             if self.config.NETWORK.AGGRE:
                 multi_views = self.aggre_layer(single_views)
             return single_views, multi_views
         else:
-            return self.resnet(views)
+            return self.hrnet(views)
 
 
 def get_multiview_pose_net(hrnet, CFG):
