@@ -7,19 +7,17 @@ import copy
 import transforms3d
 import scipy.sparse
 import cv2
-from pycocotools.coco import COCO
 
-from core.config import cfg
-from graph_utils import build_coarse_graphs
-from noise_utils import synthesize_pose
+from lib.mesh.graph_utils import build_coarse_graphs
+from lib.mesh.noise_utils import synthesize_pose
 
-from smpl import SMPL
-from coord_utils import world2cam, cam2pixel, process_bbox, rigid_align, get_bbox
-from aug_utils import affine_transform, j2d_processing, augm_params, j3d_processing
-from Human36M.noise_stats import error_distribution
+from lib.mesh.smpl import SMPL
+from lib.mesh.coord_utils import world2cam, cam2pixel, process_bbox, rigid_align, get_bbox
+from lib.mesh.aug_utils import affine_transform, j2d_processing, augm_params, j3d_processing
+from lib.dataset.noise_stats import error_distribution
 
-from funcs_utils import save_obj, stop
-from vis import vis_3d_pose, vis_2d_pose
+from lib.mesh.funcs_utils import save_obj, stop
+from lib.mesh.vis import vis_3d_pose, vis_2d_pose
 
 
 class Human36M(torch.utils.data.Dataset):
@@ -27,8 +25,8 @@ class Human36M(torch.utils.data.Dataset):
         dataset_name = 'Human36M'
         self.debug = args.debug
         self.data_split = mode
-        self.img_dir = osp.join(cfg.data_dir, dataset_name, 'images')
-        self.annot_path = osp.join(cfg.data_dir, dataset_name, 'annotations')
+        self.img_dir = osp.join(config.DATA_DIR, dataset_name, 'images')
+        self.annot_path = osp.join(config.DATA_DIR, dataset_name, 'annotations')
         self.subject_genders = {1: 'female', 5: 'female', 6: 'male', 7: 'female', 8: 'male', 9: 'male', 11: 'male'}
         self.protocol = 2
         self.action_name = ['Directions', 'Discussion', 'Eating', 'Greeting', 'Phoning', 'Posing', 'Purchases',
@@ -74,12 +72,12 @@ class Human36M(torch.utils.data.Dataset):
             (17, 11), (17, 12), (17, 18), (18, 5), (18, 6), (18, 0))
         self.joint_regressor_coco = self.mesh_model.joint_regressor_coco
 
-        self.input_joint_name = cfg.DATASET.input_joint_set  # 'coco'
+        self.input_joint_name = 'human36'  # 'coco'
         self.joint_num, self.skeleton, self.flip_pairs = self.get_joint_setting(self.input_joint_name)
 
         self.datalist, skip_idx, skip_img_path = self.load_data()
         if self.data_split == 'test':
-            det_2d_data_path = osp.join(cfg.data_dir, dataset_name, 'absnet_output_on_testset.json')
+            det_2d_data_path = osp.join(config.DATA_DIR, dataset_name, 'absnet_output_on_testset.json')
             self.datalist_pose2d_det = self.load_pose2d_det(det_2d_data_path, skip_img_path)
             print("Check lengths of annotation and detection output: ", len(self.datalist), len(self.datalist_pose2d_det))
 

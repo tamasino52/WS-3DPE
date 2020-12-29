@@ -106,10 +106,33 @@ def main():
     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
         optimizer, config.TRAIN.LR_STEP, config.TRAIN.LR_FACTOR)
 
-    # Data loading
-    normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    from lib.dataset.multiview_h36m import MultiViewH36M
+    # Data loader
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    train_dataset = eval('dataset.' + config.DATASET.TRAIN_DATASET)(
+        config, config.DATASET.TRAIN_SUBSET, True,
+        transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ]))
+    valid_dataset = eval('dataset.' + config.DATASET.TEST_DATASET)(
+        config, config.DATASET.TEST_SUBSET, False,
+        transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ]))
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=config.TRAIN.BATCH_SIZE * len(gpus),
+        shuffle=config.TRAIN.SHUFFLE,
+        num_workers=config.WORKERS,
+        pin_memory=True)
+    valid_loader = torch.utils.data.DataLoader(
+        valid_dataset,
+        batch_size=config.TEST.BATCH_SIZE * len(gpus),
+        shuffle=False,
+        num_workers=config.WORKERS,
+        pin_memory=True)
 
 
 
