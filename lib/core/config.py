@@ -23,7 +23,7 @@ config.BACKBONE_MODEL = 'pose_hrnet'
 config.MODEL = 'multiview_pose_hrnet'
 config.GPUS = '0,1'
 config.WORKERS = 24
-config.PRINT_FREQ = 100
+config.PRINT_FREQ = 1
 
 # hrnet definition
 config.MODEL_EXTRA = edict()
@@ -67,7 +67,7 @@ config.CUDNN.ENABLED = True
 config.NETWORK = edict()
 config.NETWORK.INIT_WEIGHTS = True
 config.NETWORK.PRETRAINED = '/home/cvlab/repo/WS-3DPE/pose_hrnet_w32_256x256.pth'
-config.NETWORK.NUM_JOINTS = 17
+config.NETWORK.NUM_JOINTS = 16
 config.NETWORK.HEATMAP_SIZE = np.array([64, 64])
 config.NETWORK.IMAGE_SIZE = np.array([256, 256])
 config.NETWORK.SIGMA = 2
@@ -90,12 +90,14 @@ config.LOSS.USE_TARGET_WEIGHT = True
 
 # DATASET related params
 config.DATASET = edict()
-config.DATASET.ROOT = '/home/cvlab/hdd_ext/Dataset/Human36M'
+config.DATASET.DATASET = 'Human36M'
+config.DATASET.ROOT = '/home/cvlab/hdd_ext/Dataset/'
 config.DATASET.TRAIN_DATASET = 'mixed_dataset'
 config.DATASET.TEST_DATASET = 'multi_view_h36m'
 config.DATASET.TRAIN_SUBSET = 'train'
 config.DATASET.TEST_SUBSET = 'valid'
 config.DATASET.ROOTIDX = 0
+config.DATASET.DATA_FORMAT = 'jpg'
 config.DATASET.DATA_FORMAT = 'jpg'
 config.DATASET.BBOX = 2000
 config.DATASET.CROP = True
@@ -234,9 +236,6 @@ def update_dir(model_dir, log_dir, data_dir):
     config.DATASET.ROOT = os.path.join(config.DATA_DIR, config.DATASET.ROOT)
 
     config.TEST.BBOX_FILE = os.path.join(config.DATA_DIR, config.TEST.BBOX_FILE)
-
-    config.NETWORK.PRETRAINED = os.path.join(config.DATA_DIR,
-                                             config.NETWORK.PRETRAINED)
 
 
 def get_model_name(cfg):

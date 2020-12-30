@@ -39,8 +39,7 @@ class H36MDataset(JointsDataset):
             16: 'rwri'
         }
 
-        anno_file = osp.join(self.root, 'h36m', 'annot',
-                             'h36m_{}.pkl'.format(image_set))
+        anno_file = osp.join(self.root, 'h36m_{}.pkl'.format(image_set))
         self.db = self.load_db(anno_file)
 
         self.u2a_mapping = super().get_mapping()
