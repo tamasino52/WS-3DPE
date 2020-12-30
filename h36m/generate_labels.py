@@ -56,7 +56,25 @@ if __name__ == '__main__':
     train_db = []
     test_db = []
     cnt = 0
+
+    json_data = None
+    json_camera = None
+    json_joint = None
+
     for s in subject_list:
+        annofile_data = osp.join('annotations', 'Human36M_subject{:d}_data.json'.format(s))
+        annofile_camera = osp.join('annotations', 'Human36M_subject{:d}_camera.json'.format(s))
+        annofile_joint = osp.join('annotations', 'Human36M_subject{:d}_joint_3d.json'.format(s))
+
+        with open(annofile_data) as json_file:
+            json_data = json.load(json_file)
+
+        with open(annofile_camera) as json_file:
+            json_camera = json.load(json_file)
+
+        with open(annofile_joint) as json_file:
+            json_joint = json.load(json_file)
+
         for a in action_list:
             for sa in subaction_list:
                 for c in camera_list:
@@ -85,22 +103,8 @@ if __name__ == '__main__':
                     annofile2d = osp.join('extracted', subject, 'Poses_D2_Positions', annotname)              
                     """
 
-                    annofile_data = osp.join('annotations', 'Human36M_subject{:d}_data.json'.format(s))
-                    annofile_camera = osp.join('annotations', 'Human36M_subject{:d}_camera.json'.format(s))
-                    annofile_joint = osp.join('annotations', 'Human36M_subject{:d}_joint_3d.json'.format(s))
 
-                    json_data = None
-                    json_camera = None
-                    json_joint = None
 
-                    with open(annofile_data) as json_file:
-                        json_data = json.load(json_file)
-
-                    with open(annofile_camera) as json_file:
-                        json_camera = json.load(json_file)
-
-                    with open(annofile_joint) as json_file:
-                        json_joint = json.load(json_file)
 
                     """
                     with pycdf.CDF(annofile3d) as data:
@@ -143,7 +147,7 @@ if __name__ == '__main__':
                             datum['action'] = a
                             datum['subaction'] = sa
                             datum['camera_id'] = c-1
-                            datum['source'] = 'Human36M'
+                            datum['source'] = 'h36m'
                             datum['camera'] = camera_dict
 
                             box = _infer_box(datum['joints_3d_camera'], camera_dict, 0)
@@ -163,7 +167,7 @@ if __name__ == '__main__':
     with open('h36m_train.pkl', 'wb') as f:
         pickle.dump(train_db, f)
 
-    with open('h36m_validation.pkl', 'wb') as f:
+    with open('h36m_valid.pkl', 'wb') as f:
         pickle.dump(test_db, f)
 
 
