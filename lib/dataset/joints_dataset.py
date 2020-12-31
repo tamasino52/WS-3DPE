@@ -37,7 +37,7 @@ class JointsDataset(Dataset):
         self.transform = transform
         self.db = []
 
-        self.num_joints = 17
+        self.num_joints = 20
         self.union_joints = {
             0: 'root',
             1: 'rhip',

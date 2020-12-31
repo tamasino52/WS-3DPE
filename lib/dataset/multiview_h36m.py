@@ -41,10 +41,10 @@ class MultiViewH36M(JointsDataset):
         }
 
         if cfg.DATASET.CROP:
-            anno_file = osp.join(self.root, 'h36m', 'annot',
+            anno_file = osp.join(self.root, 'h36m', 'annotations',
                                  'h36m_{}.pkl'.format(image_set))
         else:
-            anno_file = osp.join(self.root, 'h36m', 'annot',
+            anno_file = osp.join(self.root, 'h36m', 'annotations',
                                  'h36m_{}_uncrop.pkl'.format(image_set))
 
         self.db = self.load_db(anno_file)

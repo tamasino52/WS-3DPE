@@ -46,6 +46,7 @@ from lib.models.multiview_pose_hrnet import get_multiview_pose_net
 
 # Datasets
 from lib.dataset.h36m import H36MDataset
+from lib.dataset.multiview_h36m import MultiViewH36M
 
 """
 from utils.utils import create_logger
@@ -101,9 +102,10 @@ def main():
     cudnn.enabled = config.CUDNN.ENABLED
 
     # HRNet Model
-    pose_hrnet = get_pose_net(config, is_train=True)  # Pose estimation model
-    pose_hrnet.load_state_dict(torch.load(config.NETWORK.PRETRAINED), strict=False)  # Pretrained weight loading
-    mv_hrnet = get_multiview_pose_net(pose_hrnet, config)  # Multiview adopting
+    mv_hrnet = get_pose_net(config, is_train=True)
+    #pose_hrnet = get_pose_net(config, is_train=True)  # Pose estimation model
+    #pose_hrnet.load_state_dict(torch.load(config.NETWORK.PRETRAINED), strict=False)  # Pretrained weight loading
+    #mv_hrnet = get_multiview_pose_net(pose_hrnet, config)  # Multiview adopting
     #depth_hrnet = get_pose_net(config, is_train=True)  # 2.5D depth prediction model
 
     # Multi GPUs Setting
@@ -123,7 +125,6 @@ def main():
     start_epoch = config.TRAIN.BEGIN_EPOCH
     if config.TRAIN.RESUME:
         start_epoch, mv_hrnet, optimizer = load_checkpoint(mv_hrnet, optimizer, final_output_dir)
-        logger.info('=> init {} optimizer'.format(config.TRAIN.OPTIMIZER))
 
     # Scheduler
     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
@@ -139,29 +140,29 @@ def main():
 
     # Data loader
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    train_dataset = H36MDataset(config, config.DATASET.TRAIN_SUBSET, True,
-                                transforms.Compose([transforms.ToTensor(), normalize]))
     logger.info('=> loading train dataset')
-
+    train_dataset = H36MDataset(config, config.DATASET.TRAIN_SUBSET, True,
+                                  transforms.Compose([transforms.ToTensor(), normalize]))
+    #train_dataset = MultiViewH36M(config, config.DATASET.TRAIN_SUBSET, True, transforms.Compose([transforms.ToTensor(), normalize]))
+    logger.info('=> loading validation dataset')
     valid_dataset = H36MDataset(config, config.DATASET.TEST_SUBSET, False,
                                 transforms.Compose([transforms.ToTensor(), normalize]))
-    logger.info('=> loading validation dataset')
 
+    logger.info('=> loading train dataloader')
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=config.TRAIN.BATCH_SIZE * len(gpus),
         shuffle=config.TRAIN.SHUFFLE,
         num_workers=config.WORKERS,
         pin_memory=True)
-    logger.info('=> init train data loader')
 
+    logger.info('=> loading valid dataloader')
     valid_loader = torch.utils.data.DataLoader(
         valid_dataset,
         batch_size=config.TEST.BATCH_SIZE * len(gpus),
         shuffle=False,
         num_workers=config.WORKERS,
         pin_memory=True)
-    logger.info('=> init validation data loader')
 
     # Training loop
     best_perf = 0.0

@@ -23,7 +23,7 @@ config.BACKBONE_MODEL = 'pose_hrnet'
 config.MODEL = 'multiview_pose_hrnet'
 config.GPUS = '0,1'
 config.WORKERS = 24
-config.PRINT_FREQ = 1
+config.PRINT_FREQ = 100
 
 # hrnet definition
 config.MODEL_EXTRA = edict()
@@ -67,7 +67,7 @@ config.CUDNN.ENABLED = True
 config.NETWORK = edict()
 config.NETWORK.INIT_WEIGHTS = True
 config.NETWORK.PRETRAINED = '/home/cvlab/repo/WS-3DPE/pose_hrnet_w32_256x256.pth'
-config.NETWORK.NUM_JOINTS = 16
+config.NETWORK.NUM_JOINTS = 20
 config.NETWORK.HEATMAP_SIZE = np.array([64, 64])
 config.NETWORK.IMAGE_SIZE = np.array([256, 256])
 config.NETWORK.SIGMA = 2
@@ -98,13 +98,13 @@ config.DATASET.TRAIN_SUBSET = 'train'
 config.DATASET.TEST_SUBSET = 'valid'
 config.DATASET.ROOTIDX = 0
 config.DATASET.DATA_FORMAT = 'jpg'
-config.DATASET.DATA_FORMAT = 'jpg'
 config.DATASET.BBOX = 2000
 config.DATASET.CROP = True
+config.DATASET.FLIP = True
 
 # training data augmentation
-config.DATASET.SCALE_FACTOR = 0.25
-config.DATASET.ROT_FACTOR = 30
+config.DATASET.SCALE_FACTOR = 0
+config.DATASET.ROT_FACTOR = 0
 
 # train
 config.TRAIN = edict()
@@ -124,12 +124,12 @@ config.TRAIN.END_EPOCH = 210
 
 config.TRAIN.RESUME = False
 
-config.TRAIN.BATCH_SIZE = 32
+config.TRAIN.BATCH_SIZE = 48
 config.TRAIN.SHUFFLE = True
 
 # testing
 config.TEST = edict()
-config.TEST.BATCH_SIZE = 32
+config.TEST.BATCH_SIZE = 48
 config.TEST.STATE = ''
 config.TEST.POST_PROCESS = True
 config.TEST.SHIFT_HEATMAP = True
