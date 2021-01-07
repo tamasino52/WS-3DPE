@@ -93,33 +93,6 @@ if __name__ == '__main__':
                     subdir_format = 's_{:02d}_act_{:02d}_subact_{:02d}_ca_{:02d}'
                     subdir = subdir_format.format(s, a, sa, c)
 
-                    """
-                    basename = metadata.get_base_filename('S{:d}'.format(s), '{:d}'.format(a), '{:d}'.format(sa), metadata.camera_ids[c-1])
-                    annotname = basename + '.cdf'
-
-                    subject = 'S' + str(s)
-                    annofile3d = osp.join('extracted', subject, 'Poses_D3_Positions_mono_universal', annotname)
-                    annofile3d_camera = osp.join('extracted', subject, 'Poses_D3_Positions_mono', annotname)
-                    annofile2d = osp.join('extracted', subject, 'Poses_D2_Positions', annotname)              
-                    """
-
-
-
-
-                    """
-                    with pycdf.CDF(annofile3d) as data:
-                        pose3d = np.array(data['Pose'])
-                        pose3d = np.reshape(pose3d, (-1, 32, 3))
-
-                    with pycdf.CDF(annofile3d_camera) as data:
-                        pose3d_camera = np.array(data['Pose'])
-                        pose3d_camera = np.reshape(pose3d_camera, (-1, 32, 3))
-
-                    with pycdf.CDF(annofile2d) as data:
-                        pose2d = np.array(data['Pose'])
-                        pose2d = np.reshape(pose2d, (-1, 32, 2))
-                    """
-
                     nposes = json_joint[str(a)][str(sa)].__len__()
                     image_format = 's_{:02d}_act_{:02d}_subact_{:02d}_ca_{:02d}_{:06d}.jpg'
 

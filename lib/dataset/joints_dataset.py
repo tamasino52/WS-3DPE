@@ -107,6 +107,7 @@ class JointsDataset(Dataset):
         image_dir = 'images.zip@' if self.data_format == 'zip' else ''
         image_file = osp.join(self.root, db_rec['source'], image_dir, 'images',
                               db_rec['image'])
+
         if self.data_format == 'zip':
             from utils import zipreader
             data_numpy = zipreader.imread(
@@ -121,6 +122,7 @@ class JointsDataset(Dataset):
         center = np.array(db_rec['center']).copy()
         scale = np.array(db_rec['scale']).copy()
         rotation = 0
+        score = db_rec['score'] if 'score' in db_rec else 1
 
         if self.is_train:
             sf = self.scale_factor
@@ -152,14 +154,17 @@ class JointsDataset(Dataset):
         target_weight = torch.from_numpy(target_weight)
 
         meta = {
+            'image': image_file,
             'scale': scale,
             'center': center,
             'rotation': rotation,
             'joints_2d': db_rec['joints_2d'],
             'joints_2d_transformed': joints,
             'joints_vis': joints_vis,
-            'source': db_rec['source']
+            'source': db_rec['source'],
+            'score': score
         }
+
         return input, target, target_weight, meta
 
     def generate_target(self, joints_3d, joints_vis):

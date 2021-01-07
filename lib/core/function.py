@@ -104,7 +104,7 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
 
     num_samples = len(val_dataset)
     all_preds = np.zeros(
-        (num_samples, config.MODEL.NUM_JOINTS, 3),
+        (num_samples, config.NETWORK.NUM_JOINTS, 3),
         dtype=np.float32
     )
     all_boxes = np.zeros((num_samples, 6))

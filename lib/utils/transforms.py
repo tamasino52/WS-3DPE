@@ -62,8 +62,8 @@ def get_affine_transform(
         print(scale)
         scale = np.array([scale, scale])
 
-    scale_tmp = scale * 200.0
-    src_w = scale_tmp[0]
+    scale_tmp = scale * 200.0  # 센터를 중심으로 얼만큼 확대
+    src_w = max(scale_tmp[0], scale_tmp[1])
     dst_w = output_size[0]
     dst_h = output_size[1]
 

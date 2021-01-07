@@ -123,7 +123,7 @@ def save_debug_images(config, input, meta, target, joints_pred, output,
 
     if config.DEBUG.SAVE_BATCH_IMAGES_GT:
         save_batch_image_with_joints(
-            input, meta['joints_2d'], meta['joints_vis'],
+            input, meta['joints_2d_transformed'], meta['joints_vis'],
             '{}_gt.jpg'.format(prefix)
         )
     if config.DEBUG.SAVE_BATCH_IMAGES_PRED:
