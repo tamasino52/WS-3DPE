@@ -124,12 +124,12 @@ config.TRAIN.END_EPOCH = 210
 
 config.TRAIN.RESUME = False
 
-config.TRAIN.BATCH_SIZE = 48
+config.TRAIN.BATCH_SIZE = 8
 config.TRAIN.SHUFFLE = True
 
 # testing
 config.TEST = edict()
-config.TEST.BATCH_SIZE = 48
+config.TEST.BATCH_SIZE = 8
 config.TEST.STATE = ''
 config.TEST.POST_PROCESS = True
 config.TEST.SHIFT_HEATMAP = True

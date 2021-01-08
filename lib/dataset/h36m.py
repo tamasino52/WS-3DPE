@@ -11,6 +11,7 @@ from __future__ import print_function
 import os.path as osp
 import numpy as np
 import pickle
+import collections
 
 from dataset.joints_dataset import JointsDataset
 
@@ -103,3 +104,36 @@ class H36MDataset(JointsDataset):
         return 's_{:02}_act_{:02}_subact_{:02}_imgid_{:06}'.format(
             datum['subject'], datum['action'], datum['subaction'],
             datum['image_id'])
+
+    def evaluate(self, pred, *args, **kwargs):
+        pred = pred.copy()
+
+        headsize = self.image_size[0] / 10.0
+        threshold = 0.5
+
+        u2a = self.u2a_mapping
+        a2u = {v: k for k, v in u2a.items() if v != '*'}
+        a = list(a2u.keys())
+        u = list(a2u.values())
+        indexes = list(range(len(a)))
+        indexes.sort(key=a.__getitem__)
+        sa = list(map(a.__getitem__, indexes))
+        su = np.array(list(map(u.__getitem__, indexes)))
+
+        gt = []
+        for items in self.grouping:
+            for item in items:
+                gt.append(self.db[item]['joints_2d'][su, :2])
+        gt = np.array(gt)
+        pred = pred[:, su, :2]
+
+        distance = np.sqrt(np.sum((gt - pred) ** 2, axis=2))
+        detected = (distance <= headsize * threshold)
+
+        joint_detection_rate = np.sum(detected, axis=0) / np.float(gt.shape[0])
+
+        name_values = collections.OrderedDict()
+        joint_names = self.actual_joints
+        for i in range(len(a2u)):
+            name_values[joint_names[sa[i]]] = joint_detection_rate[i]
+        return name_values, np.mean(joint_detection_rate)

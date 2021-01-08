@@ -35,62 +35,118 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
     model.train()
 
     end = time.time()
-    for i, (input, target, target_weight, meta) in enumerate(train_loader):
+    for i, (inputs, targets, target_weights, meta) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
         # compute output
-        outputs = model(input)
+        outputs = model(inputs)
 
-        target = target.cuda(non_blocking=True)
-        target_weight = target_weight.cuda(non_blocking=True)
-
-        if isinstance(outputs, list):
-            loss = criterion(outputs[0], target, target_weight)
-            for output in outputs[1:]:
-                loss += criterion(output, target, target_weight)
-        else:
+        if not isinstance(outputs, list) and not isinstance(targets, list) and not isinstance(target_weights, list):
+            # Single view
             output = outputs
+            target = targets
+            target_weight = target_weights
+
+            target = target.cuda(non_blocking=True)
+            target_weight = target_weight.cuda(non_blocking=True)
             loss = criterion(output, target, target_weight)
 
-        # loss = criterion(output, target, target_weight)
+            # compute gradient and do update step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-        # compute gradient and do update step
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            # measure accuracy and record loss
+            losses.update(loss.item(), inputs.size(0))
 
-        # measure accuracy and record loss
-        losses.update(loss.item(), input.size(0))
+            _, avg_acc, cnt, pred = accuracy(output.detach().cpu().numpy(),
+                                             target.detach().cpu().numpy())
+            acc.update(avg_acc, cnt)
 
-        _, avg_acc, cnt, pred = accuracy(output.detach().cpu().numpy(),
-                                         target.detach().cpu().numpy())
-        acc.update(avg_acc, cnt)
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
 
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
+            if i % config.PRINT_FREQ == 0:
+                msg = 'Epoch: [{0}][{1}/{2}]\t' \
+                      'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t' \
+                      'Speed {speed:.1f} samples/s\t' \
+                      'Data {data_time.val:.3f}s ({data_time.avg:.3f}s)\t' \
+                      'Loss {loss.val:.5f} ({loss.avg:.5f})\t' \
+                      'Accuracy {acc.val:.3f} ({acc.avg:.3f})'.format(
+                    epoch, i, len(train_loader), batch_time=batch_time,
+                    speed=input.size(0) / batch_time.val,
+                    data_time=data_time, loss=losses, acc=acc)
+                logger.info(msg)
 
-        if i % config.PRINT_FREQ == 0:
-            msg = 'Epoch: [{0}][{1}/{2}]\t' \
-                  'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t' \
-                  'Speed {speed:.1f} samples/s\t' \
-                  'Data {data_time.val:.3f}s ({data_time.avg:.3f}s)\t' \
-                  'Loss {loss.val:.5f} ({loss.avg:.5f})\t' \
-                  'Accuracy {acc.val:.3f} ({acc.avg:.3f})'.format(
-                      epoch, i, len(train_loader), batch_time=batch_time,
-                      speed=input.size(0)/batch_time.val,
-                      data_time=data_time, loss=losses, acc=acc)
-            logger.info(msg)
+                writer = writer_dict['writer']
+                global_steps = writer_dict['train_global_steps']
+                writer.add_scalar('train_loss', losses.val, global_steps)
+                writer.add_scalar('train_acc', acc.val, global_steps)
+                writer_dict['train_global_steps'] = global_steps + 1
 
-            writer = writer_dict['writer']
-            global_steps = writer_dict['train_global_steps']
-            writer.add_scalar('train_loss', losses.val, global_steps)
-            writer.add_scalar('train_acc', acc.val, global_steps)
-            writer_dict['train_global_steps'] = global_steps + 1
+                prefix = '{}_{}'.format(os.path.join(output_dir, 'train'), i)
+                save_debug_images(config, input, meta, target, pred * 4, output, prefix)
 
-            prefix = '{}_{}'.format(os.path.join(output_dir, 'train'), i)
-            save_debug_images(config, input, meta, target, pred*4, output, prefix)
+        else:
+            # Multi view
+            outputs = outputs[1]
+
+            targets = [target.cuda(non_blocking=True) for target in targets]
+            target_weights = [target_weight.cuda(non_blocking=True) for target_weight in target_weights]
+
+            loss = criterion(outputs[0], targets[0], target_weights[0])
+            for output, target, target_weight in zip(outputs[1:], targets[1:], target_weights[1:]):
+                loss += criterion(output, target, target_weight)
+
+            # compute gradient and do update step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # measure accuracy and record loss
+            losses.update(loss.item(), inputs[0].size(0))
+
+            preds = []
+            cnts = 0
+            avg_acc = 0
+            for output, target in zip(outputs, targets):
+                pred_acc, _, cnt, pred = accuracy(output.detach().cpu().numpy(), target.detach().cpu().numpy())
+                preds.append(pred)
+                cnts += cnt
+                for idx in pred_acc[1:]:
+                    avg_acc = avg_acc + idx if idx >= 0 else avg_acc
+
+            avg_acc = avg_acc / cnts if cnts != 0 else 0
+            acc.update(avg_acc, cnts)
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % config.PRINT_FREQ == 0:
+                msg = 'Epoch: [{0}][{1}/{2}]\t' \
+                      'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t' \
+                      'Speed {speed:.1f} samples/s\t' \
+                      'Data {data_time.val:.3f}s ({data_time.avg:.3f}s)\t' \
+                      'Loss {loss.val:.5f} ({loss.avg:.5f})\t' \
+                      'Accuracy {acc.val:.3f} ({acc.avg:.3f})'.format(
+                    epoch, i, len(train_loader), batch_time=batch_time,
+                    speed=inputs.__len__() * inputs[0].size(0) / batch_time.val,
+                    data_time=data_time, loss=losses, acc=acc)
+                logger.info(msg)
+
+                writer = writer_dict['writer']
+                global_steps = writer_dict['train_global_steps']
+                writer.add_scalar('train_loss', losses.val, global_steps)
+                writer.add_scalar('train_acc', acc.val, global_steps)
+                writer_dict['train_global_steps'] = global_steps + 1
+
+                for v in range(4):
+                    prefix = '{}_{}_{}'.format(os.path.join(output_dir, 'train'), i, v)
+                    save_debug_images(config, inputs[v], meta[v], targets[v], preds[v] * 4, outputs[v], prefix)
+
 
 
 def validate(config, val_loader, val_dataset, model, criterion, output_dir,
@@ -110,7 +166,6 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
     all_boxes = np.zeros((num_samples, 6))
     image_path = []
     filenames = []
-    imgnums = []
     idx = 0
     with torch.no_grad():
         end = time.time()
@@ -121,27 +176,6 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
                 output = outputs[-1]
             else:
                 output = outputs
-
-            if config.TEST.FLIP_TEST:
-                input_flipped = input.flip(3)
-                outputs_flipped = model(input_flipped)
-
-                if isinstance(outputs_flipped, list):
-                    output_flipped = outputs_flipped[-1]
-                else:
-                    output_flipped = outputs_flipped
-
-                output_flipped = flip_back(output_flipped.cpu().numpy(),
-                                           val_dataset.flip_pairs)
-                output_flipped = torch.from_numpy(output_flipped.copy()).cuda()
-
-
-                # feature is not aligned, shift flipped heatmap for higher accuracy
-                if config.TEST.SHIFT_HEATMAP:
-                    output_flipped[:, :, :, 1:] = \
-                        output_flipped.clone()[:, :, :, 0:-1]
-
-                output = (output + output_flipped) * 0.5
 
             target = target.cuda(non_blocking=True)
             target_weight = target_weight.cuda(non_blocking=True)
@@ -195,10 +229,10 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
 
         name_values, perf_indicator = val_dataset.evaluate(
             config, all_preds, output_dir, all_boxes, image_path,
-            filenames, imgnums
+            filenames
         )
 
-        model_name = config.MODEL.NAME
+        model_name = config.MODEL
         if isinstance(name_values, list):
             for name_value in name_values:
                 _print_name_value(name_value, model_name)

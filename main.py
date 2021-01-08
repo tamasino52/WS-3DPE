@@ -102,10 +102,10 @@ def main():
     cudnn.enabled = config.CUDNN.ENABLED
 
     # HRNet Model
-    mv_hrnet = get_pose_net(config, is_train=True)
+    pose_hrnet = get_pose_net(config, is_train=True)
     #pose_hrnet = get_pose_net(config, is_train=True)  # Pose estimation model
     #pose_hrnet.load_state_dict(torch.load(config.NETWORK.PRETRAINED), strict=False)  # Pretrained weight loading
-    #mv_hrnet = get_multiview_pose_net(pose_hrnet, config)  # Multiview adopting
+    mv_hrnet = get_multiview_pose_net(pose_hrnet, config)  # Multiview adopting
     #depth_hrnet = get_pose_net(config, is_train=True)  # 2.5D depth prediction model
 
     # Multi GPUs Setting
@@ -141,11 +141,10 @@ def main():
     # Data loader
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     logger.info('=> loading train dataset')
-    train_dataset = H36MDataset(config, config.DATASET.TRAIN_SUBSET, True,
-                                  transforms.Compose([transforms.ToTensor(), normalize]))
-    #train_dataset = MultiViewH36M(config, config.DATASET.TRAIN_SUBSET, True, transforms.Compose([transforms.ToTensor(), normalize]))
+    # H36MDataset
+    train_dataset = MultiViewH36M(config, config.DATASET.TRAIN_SUBSET, True, transforms.Compose([transforms.ToTensor(), normalize]))
     logger.info('=> loading validation dataset')
-    valid_dataset = H36MDataset(config, config.DATASET.TEST_SUBSET, False,
+    valid_dataset = MultiViewH36M(config, config.DATASET.TEST_SUBSET, False,
                                 transforms.Compose([transforms.ToTensor(), normalize]))
 
     logger.info('=> loading train dataloader')
