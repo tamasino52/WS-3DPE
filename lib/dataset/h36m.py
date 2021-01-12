@@ -40,7 +40,12 @@ class H36MDataset(JointsDataset):
             16: 'rwri'
         }
 
+        self.pair_joints = [
+            (0, 7), (7, 8), (8, 9), (9, 10), (8, 11), (11, 12), (12, 13), (8, 14), (14, 15), (15, 16), (0, 1), (1, 2),
+            (2, 3), (0, 4), (4, 5), (5, 6)]
+
         anno_file = osp.join(self.root, 'h36m', 'annotations', 'h36m_{}.pkl'.format(image_set))
+
         self.db = self.load_db(anno_file)
 
         self.u2a_mapping = super().get_mapping()
@@ -48,6 +53,21 @@ class H36MDataset(JointsDataset):
 
         self.grouping = self.get_group(self.db)
         self.group_size = len(self.grouping)
+
+
+    def euclidean_distance(self, pt1, pt2):
+        distance = 0
+        for i in range(len(pt1)):
+            distance += (pt1[i] - pt2[i]) ** 2
+        return distance ** 0.5
+
+    def get_normal_limb_length(self, pose):
+        edges = []
+        for parent, child in self.pair_joints:
+            edges.append(self.euclidean_distance(pose[parent], pose[child]))
+        mean_length = sum(edges) / len(edges)
+        edges = [edge / mean_length for edge in edges]
+        return edges
 
     def index_to_action_names(self):
         return {

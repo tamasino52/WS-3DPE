@@ -17,6 +17,8 @@ import torch
 
 from core.evaluate import accuracy
 from core.inference import get_final_preds
+from core.inference import get_max_preds
+
 from utils.transforms import flip_back
 from utils.vis import save_debug_images
 
@@ -35,118 +37,57 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
     model.train()
 
     end = time.time()
-    for i, (inputs, targets, target_weights, meta) in enumerate(train_loader):
+    for i, (inputs, targets, target_weights, metas, limb) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
         # compute output
-        outputs = model(inputs)
+        output_heatmaps, output_depthmaps = model(inputs)
 
-        if not isinstance(outputs, list) and not isinstance(targets, list) and not isinstance(target_weights, list):
-            # Single view
-            output = outputs
-            target = targets
-            target_weight = target_weights
+        # load on cuda
+        targets = [target.cuda(non_blocking=True) for target in targets]
+        target_weights = [target_weight.cuda(non_blocking=True) for target_weight in target_weights]
 
-            target = target.cuda(non_blocking=True)
-            target_weight = target_weight.cuda(non_blocking=True)
-            loss = criterion(output, target, target_weight)
+        # compute gradient and do update step
+        loss = criterion(output_heatmaps, output_depthmaps, targets, target_weights, limb)
 
-            # compute gradient and do update step
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+        # compute gradient and do update step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
-            # measure accuracy and record loss
-            losses.update(loss.item(), inputs.size(0))
+        # measure accuracy and record loss
+        losses.update(loss.item(), inputs.size(0))
 
-            _, avg_acc, cnt, pred = accuracy(output.detach().cpu().numpy(),
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
+
+        for view, (output_heatmap, target, target_weight, meta) in enumerate(zip(output_heatmaps, targets, target_weights, metas)):
+            _, avg_acc, cnt, pred = accuracy(output_heatmap.detach().cpu().numpy(),
                                              target.detach().cpu().numpy())
             acc.update(avg_acc, cnt)
 
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
+            prefix = '{}_{}_{}'.format(os.path.join(output_dir, 'train'), i, view)
+            save_debug_images(config, input, meta, target, pred * 4, output_heatmap, prefix)
 
-            if i % config.PRINT_FREQ == 0:
-                msg = 'Epoch: [{0}][{1}/{2}]\t' \
-                      'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t' \
-                      'Speed {speed:.1f} samples/s\t' \
-                      'Data {data_time.val:.3f}s ({data_time.avg:.3f}s)\t' \
-                      'Loss {loss.val:.5f} ({loss.avg:.5f})\t' \
-                      'Accuracy {acc.val:.3f} ({acc.avg:.3f})'.format(
-                    epoch, i, len(train_loader), batch_time=batch_time,
-                    speed=input.size(0) / batch_time.val,
-                    data_time=data_time, loss=losses, acc=acc)
-                logger.info(msg)
+        if i % config.PRINT_FREQ == 0:
+            msg = 'Epoch: [{0}][{1}/{2}]\t' \
+                  'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t' \
+                  'Speed {speed:.1f} samples/s\t' \
+                  'Data {data_time.val:.3f}s ({data_time.avg:.3f}s)\t' \
+                  'Loss {loss.val:.5f} ({loss.avg:.5f})\t' \
+                  'Accuracy {acc.val:.3f} ({acc.avg:.3f})'.format(
+                epoch, i, len(train_loader), batch_time=batch_time,
+                speed=inputs[0].size(0) * len(inputs) / batch_time.val,
+                data_time=data_time, loss=losses, acc=acc)
+            logger.info(msg)
 
-                writer = writer_dict['writer']
-                global_steps = writer_dict['train_global_steps']
-                writer.add_scalar('train_loss', losses.val, global_steps)
-                writer.add_scalar('train_acc', acc.val, global_steps)
-                writer_dict['train_global_steps'] = global_steps + 1
-
-                prefix = '{}_{}'.format(os.path.join(output_dir, 'train'), i)
-                save_debug_images(config, input, meta, target, pred * 4, output, prefix)
-
-        else:
-            # Multi view
-            outputs = outputs[1]
-
-            targets = [target.cuda(non_blocking=True) for target in targets]
-            target_weights = [target_weight.cuda(non_blocking=True) for target_weight in target_weights]
-
-            loss = criterion(outputs[0], targets[0], target_weights[0])
-            for output, target, target_weight in zip(outputs[1:], targets[1:], target_weights[1:]):
-                loss += criterion(output, target, target_weight)
-
-            # compute gradient and do update step
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            # measure accuracy and record loss
-            losses.update(loss.item(), inputs[0].size(0))
-
-            preds = []
-            cnts = 0
-            avg_acc = 0
-            for output, target in zip(outputs, targets):
-                pred_acc, _, cnt, pred = accuracy(output.detach().cpu().numpy(), target.detach().cpu().numpy())
-                preds.append(pred)
-                cnts += cnt
-                for idx in pred_acc[1:]:
-                    avg_acc = avg_acc + idx if idx >= 0 else avg_acc
-
-            avg_acc = avg_acc / cnts if cnts != 0 else 0
-            acc.update(avg_acc, cnts)
-
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
-
-            if i % config.PRINT_FREQ == 0:
-                msg = 'Epoch: [{0}][{1}/{2}]\t' \
-                      'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t' \
-                      'Speed {speed:.1f} samples/s\t' \
-                      'Data {data_time.val:.3f}s ({data_time.avg:.3f}s)\t' \
-                      'Loss {loss.val:.5f} ({loss.avg:.5f})\t' \
-                      'Accuracy {acc.val:.3f} ({acc.avg:.3f})'.format(
-                    epoch, i, len(train_loader), batch_time=batch_time,
-                    speed=inputs.__len__() * inputs[0].size(0) / batch_time.val,
-                    data_time=data_time, loss=losses, acc=acc)
-                logger.info(msg)
-
-                writer = writer_dict['writer']
-                global_steps = writer_dict['train_global_steps']
-                writer.add_scalar('train_loss', losses.val, global_steps)
-                writer.add_scalar('train_acc', acc.val, global_steps)
-                writer_dict['train_global_steps'] = global_steps + 1
-
-                for v in range(4):
-                    prefix = '{}_{}_{}'.format(os.path.join(output_dir, 'train'), i, v)
-                    save_debug_images(config, inputs[v], meta[v], targets[v], preds[v] * 4, outputs[v], prefix)
-
+            writer = writer_dict['writer']
+            global_steps = writer_dict['train_global_steps']
+            writer.add_scalar('train_loss', losses.val, global_steps)
+            writer.add_scalar('train_acc', acc.val, global_steps)
+            writer_dict['train_global_steps'] = global_steps + 1
 
 
 def validate(config, val_loader, val_dataset, model, criterion, output_dir,

@@ -40,7 +40,7 @@ from lib.core.function import train
 from lib.core.function import validate
 
 # Models
-from lib.core.loss import JointsMSELoss, LimbLengthLoss, MultiViewConsistencyLoss
+from lib.core.loss import WeaklySupervisedLoss
 from lib.models.pose_hrnet import get_pose_net
 from lib.models.multiview_pose_hrnet import get_multiview_pose_net
 
@@ -101,20 +101,21 @@ def main():
     cudnn.deterministic = config.CUDNN.DETERMINISTIC
     cudnn.enabled = config.CUDNN.ENABLED
 
-    # HRNet Model
-    pose_hrnet = get_pose_net(config, is_train=True)
-    #pose_hrnet = get_pose_net(config, is_train=True)  # Pose estimation model
+    # Single HRNet Model
+    pose_hrnet = get_pose_net(config, is_train=True)  # Pose estimation model
+    depth_hrnet = get_pose_net(config, is_train=True)  # 2.5D depth prediction model
     #pose_hrnet.load_state_dict(torch.load(config.NETWORK.PRETRAINED), strict=False)  # Pretrained weight loading
-    mv_hrnet = get_multiview_pose_net(pose_hrnet, config)  # Multiview adopting
-    #depth_hrnet = get_pose_net(config, is_train=True)  # 2.5D depth prediction model
+
+    # Multiview adopting
+    mv_hrnet = get_multiview_pose_net(pose_hrnet, depth_hrnet, config)
 
     # Multi GPUs Setting
     gpus = [int(i) for i in config.GPUS.split(',')]
     mv_hrnet = torch.nn.DataParallel(mv_hrnet, device_ids=gpus).cuda()
-    logger.info('=> init data parallel model')
+    logger.info('=> parallelize model')
 
     # Loss
-    criterion = JointsMSELoss(use_target_weight=config.LOSS.USE_TARGET_WEIGHT).cuda()
+    criterion = WeaklySupervisedLoss(use_target_weight=config.LOSS.USE_TARGET_WEIGHT).cuda()
     logger.info('=> init criterion')
 
     # Optimizer
@@ -140,14 +141,16 @@ def main():
 
     # Data loader
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
     logger.info('=> loading train dataset')
-    # H36MDataset
-    train_dataset = MultiViewH36M(config, config.DATASET.TRAIN_SUBSET, True, transforms.Compose([transforms.ToTensor(), normalize]))
+    train_dataset = MultiViewH36M(config, config.DATASET.TRAIN_SUBSET, True,
+                                  transforms.Compose([transforms.ToTensor(), normalize]))
+
     logger.info('=> loading validation dataset')
     valid_dataset = MultiViewH36M(config, config.DATASET.TEST_SUBSET, False,
-                                transforms.Compose([transforms.ToTensor(), normalize]))
+                                  transforms.Compose([transforms.ToTensor(), normalize]))
 
-    logger.info('=> loading train dataloader')
+    logger.info('=> loading train data loader')
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=config.TRAIN.BATCH_SIZE * len(gpus),
@@ -155,7 +158,7 @@ def main():
         num_workers=config.WORKERS,
         pin_memory=True)
 
-    logger.info('=> loading valid dataloader')
+    logger.info('=> loading valid data loader')
     valid_loader = torch.utils.data.DataLoader(
         valid_dataset,
         batch_size=config.TEST.BATCH_SIZE * len(gpus),
@@ -170,12 +173,25 @@ def main():
         lr_scheduler.step()
 
         # Trainer
-        train(config, train_loader, mv_hrnet, criterion, optimizer, epoch,
-              final_output_dir, tb_log_dir, writer_dict)
+        train(config,
+              train_loader,
+              mv_hrnet,
+              criterion,
+              optimizer,
+              epoch,
+              final_output_dir,
+              tb_log_dir,
+              writer_dict)
 
         # Performance indicator
-        perf_indicator = validate(config, valid_loader, valid_dataset, mv_hrnet,
-                                  criterion, final_output_dir, tb_log_dir, writer_dict)
+        perf_indicator = validate(config,
+                                  valid_loader,
+                                  valid_dataset,
+                                  mv_hrnet,
+                                  criterion,
+                                  final_output_dir,
+                                  tb_log_dir,
+                                  writer_dict)
 
         if perf_indicator > best_perf:
             best_perf = perf_indicator

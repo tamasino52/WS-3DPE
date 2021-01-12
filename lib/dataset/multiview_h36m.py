@@ -41,9 +41,10 @@ class MultiViewH36M(JointsDataset):
         }
 
         anno_file = osp.join(self.root, 'h36m', 'annotations', 'h36m_{}.pkl'.format(image_set))
+        limb_file = osp.join(self.root, 'h36m', 'annotations', 'avg_limb.pkl')
 
         self.db = self.load_db(anno_file)
-
+        self.limb = self.load_db(limb_file)
         self.u2a_mapping = super().get_mapping()
         super().do_mapping()
 
@@ -105,7 +106,7 @@ class MultiViewH36M(JointsDataset):
             target.append(t)
             weight.append(w)
             meta.append(m)
-        return input, target, weight, meta
+        return input, target, weight, meta, self.limb
 
     def __len__(self):
         return self.group_size
