@@ -61,7 +61,7 @@ def parse_args():
     parser.add_argument(
         '--post-process', help='use post process', action='store_true')
     parser.add_argument(
-        '--shift-heatmap', help='shift heatmap', action='store_true')
+        '--shift-batch_heatmap', help='shift batch_heatmap', action='store_true')
 
     # philly
     parser.add_argument(

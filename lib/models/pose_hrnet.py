@@ -492,10 +492,10 @@ class PoseHighResolutionNet(nn.Module):
             raise ValueError('{} is not exist!'.format(pretrained))
 
 
-def get_pose_net(cfg, is_train, **kwargs):
+def get_pose_net(cfg, is_pretrain, **kwargs):
     model = PoseHighResolutionNet(cfg, **kwargs)
 
-    if is_train and cfg['NETWORK']['INIT_WEIGHTS']:
+    if is_pretrain and cfg['NETWORK']['INIT_WEIGHTS']:
         model.init_weights(cfg['NETWORK']['PRETRAINED'])
 
     return model

@@ -12,7 +12,7 @@ import os.path as osp
 import numpy as np
 import pickle
 import collections
-
+import torch
 from dataset.joints_dataset import JointsDataset
 
 
@@ -44,7 +44,7 @@ class MultiViewH36M(JointsDataset):
         limb_file = osp.join(self.root, 'h36m', 'annotations', 'avg_limb.pkl')
 
         self.db = self.load_db(anno_file)
-        self.limb = self.load_db(limb_file)
+        self.limb = torch.FloatTensor(self.load_db(limb_file))
         self.u2a_mapping = super().get_mapping()
         super().do_mapping()
 

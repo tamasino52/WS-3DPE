@@ -47,6 +47,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         # load on cuda
         targets = [target.cuda(non_blocking=True) for target in targets]
         target_weights = [target_weight.cuda(non_blocking=True) for target_weight in target_weights]
+        limb = limb.cuda(non_blocking=True)
 
         # compute gradient and do update step
         loss = criterion(output_heatmaps, output_depthmaps, targets, target_weights, limb)

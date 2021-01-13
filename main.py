@@ -23,6 +23,7 @@ import lib
 import dataset
 import models
 import utils
+import multiviews
 
 # Utils
 from lib.utils.utils import get_optimizer
@@ -102,8 +103,8 @@ def main():
     cudnn.enabled = config.CUDNN.ENABLED
 
     # Single HRNet Model
-    pose_hrnet = get_pose_net(config, is_train=True)  # Pose estimation model
-    depth_hrnet = get_pose_net(config, is_train=True)  # 2.5D depth prediction model
+    pose_hrnet = get_pose_net(config, is_pretrain=True)  # Pose estimation model
+    depth_hrnet = get_pose_net(config, is_pretrain=False)  # 2.5D depth prediction model
     #pose_hrnet.load_state_dict(torch.load(config.NETWORK.PRETRAINED), strict=False)  # Pretrained weight loading
 
     # Multiview adopting
