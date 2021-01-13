@@ -55,7 +55,7 @@ def save_batch_heatmaps(batch_image, batch_heatmaps, file_name,
                         normalize=True):
     '''
     batch_image: [batch_size, channel, height, width]
-    batch_heatmap: ['batch_size, num_joints, height, width]
+    batch_heatmaps: ['batch_size, num_joints, height, width]
     file_name: saved file name
     '''
     if normalize:

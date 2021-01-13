@@ -1,19 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="손실함수 수">
-      <change afterPath="$PROJECT_DIR$/lib/multiviews/procrustes.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="Limb Length Loss added">
       <change beforePath="$PROJECT_DIR$/lib/core/evaluate.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/evaluate.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/core/function.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/function.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/inference.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/inference.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/core/loss.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/loss.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/dataset/multiview_h36m.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/dataset/multiview_h36m.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/models/pose_hrnet.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/models/pose_hrnet.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/multiviews/pictorial.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/multiviews/pictorial.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/multiviews/pictorial_cuda.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/multiviews/pictorial_cuda.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/utils/vis.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/utils/vis.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/run/pose2d/valid.py" beforeDir="false" afterPath="$PROJECT_DIR$/run/pose2d/valid.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -193,7 +186,14 @@
       <option name="project" value="LOCAL" />
       <updated>1610454078114</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="Limb Length Loss added">
+      <created>1610537215049</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1610537215049</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -216,7 +216,8 @@
     <MESSAGE value="etc" />
     <MESSAGE value="버그픽스" />
     <MESSAGE value="손실함수 수" />
-    <option name="LAST_COMMIT_MESSAGE" value="손실함수 수" />
+    <MESSAGE value="Limb Length Loss added" />
+    <option name="LAST_COMMIT_MESSAGE" value="Limb Length Loss added" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

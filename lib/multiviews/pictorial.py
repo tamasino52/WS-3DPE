@@ -146,11 +146,11 @@ def compute_unary_term(heatmap, grid, bbox2D, cam, imgSize):
     Args:
         heatmap: array of size (n * k * h * w)
                 -n: number of views,  -k: number of joints
-                -h: batch_heatmap height,   -w: batch_heatmap width
+                -h: heatmap height,   -w: heatmap width
         grid: list of k ndarrays of size (nbins * 3)
                     -k: number of joints; 1 when the grid is shared in PSM
                     -nbins: number of bins in the grid
-        bbox2D: bounding box on which batch_heatmap is computed
+        bbox2D: bounding box on which heatmap is computed
     Returns:
         unary_of_all_joints: a list of ndarray of size nbins
     """
