@@ -11,9 +11,6 @@ from __future__ import print_function
 import torch
 import torch.nn as nn
 
-from multiviews.procrustes import batch_compute_similarity_transform_torch
-
-
 def get_max_preds(batch_heatmap):
     batch_size = batch_heatmap.shape[0]
     num_joints = batch_heatmap.shape[1]
@@ -161,22 +158,54 @@ class LimbLengthLoss(nn.Module):
         num_edges = length_pred.shape[1]
         length_pred = length_pred.reshape((batch_size, num_edges, -1))
         length_gt = target.reshape((batch_size, num_edges, -1))
-        loss = ((length_pred - length_gt) ** 2).mul(length_weight).sum() / batch_size
-        return loss
+        loss = ((length_pred - length_gt) ** 2).mul(length_weight).sum()
+        return loss / num_edges
 
 
 class MultiViewConsistencyLoss(nn.Module):
     def __init__(self, use_target_weight):
         super(MultiViewConsistencyLoss, self).__init__()
-        self.mse = nn.MSELoss(reduction='mean')
+        self.criterion = nn.MSELoss(reduction='mean')
         self.use_target_weight = use_target_weight
+        self.human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
+                             (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
+        self.human36_root = {
+            0: 0,
+            1: 0,
+            2: 1,
+            3: 2,
+            4: 0,
+            5: 4,
+            6: 5,
+            7: 0,
+            9: 7,
+            11: 9,
+            12: 11,
+            14: 9,
+            15: 14,
+            16: 15,
+            17: 9,
+            18: 17,
+            19: 18,
+        }
+
+    def get_kinematic_chain_space(self, output):
+        parent = torch.index_select(output, 1, torch.cuda.LongTensor([item[0] for item in self.human36_edge]))
+        child = torch.index_select(output, 1, torch.cuda.LongTensor([item[1] for item in self.human36_edge]))
+
+        joint_3d_vector = parent - child
+        kcs = joint_3d_vector.bmm(joint_3d_vector.transpose(1, 2))
+        return kcs
 
     def forward(self, joints_3ds, output_weights, target_weights):
         root_joints_3d = joints_3ds[0]
-        root_output_weight = output_weights[0]
-        root_target_weight = target_weights[0]
+        num_edge = root_joints_3d.size(1)
+        root_kcs = self.get_kinematic_chain_space(root_joints_3d)
+        loss = 0
         for joints_3d, output_weight, target_weight in zip(joints_3ds[1:], output_weights[1:], target_weights[1:]):
-            pass
+            kcs = self.get_kinematic_chain_space(joints_3d)
+            loss += self.criterion(kcs, root_kcs)
+        return loss / num_edge
 
 
 class WeaklySupervisedLoss(nn.Module):
@@ -187,8 +216,8 @@ class WeaklySupervisedLoss(nn.Module):
         self.criterion3 = MultiViewConsistencyLoss(use_target_weight)
 
         self.use_target_weight = use_target_weight
-        self.alpha = 10.0
-        self.beta = 100.0
+        self.alpha = 1.0
+        self.beta = 1.0
 
     def forward(self, hm_outputs, dm_outputs, targets, target_weights, limb):
         joints_mse_loss = 0
@@ -199,9 +228,10 @@ class WeaklySupervisedLoss(nn.Module):
         for heatmap, depthmap, target, target_weight in zip(hm_outputs, dm_outputs, targets, target_weights):
             joints_3d, pred_weight = get_3d_joints(heatmap, depthmap)
             joints_mse_loss += self.criterion1(heatmap, target, target_weight)
+            #multiview_consistency_loss += self.criterion3(joints_3ds, pred_weights, target_weights)
             limb_length_loss += self.criterion2(joints_3d, limb, pred_weight)
-            joints_3ds.append(joints_3d)
-            pred_weights.append(pred_weight)
-            cnt += 1
-        multiview_consistency_loss += self.criterion3(joints_3ds, pred_weights, target_weights)
-        return joints_mse_loss / cnt + self.alpha * limb_length_loss / cnt + self.beta * multiview_consistency_loss
+            #joints_3ds.append(joints_3d)
+            #pred_weights.append(pred_weight)
+            #cnt += 1
+        #multiview_consistency_loss += self.criterion3(joints_3ds, pred_weights, target_weights)
+        return joints_mse_loss + limb_length_loss #+ self.alpha * multiview_consistency_loss

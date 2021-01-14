@@ -58,13 +58,13 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         optimizer.step()
 
         # measure accuracy and record loss
-        losses.update(loss.item(), inputs.size(0))
+        losses.update(loss.item(), len(inputs) * inputs[0].size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
 
-        for view, (output_heatmap, target, target_weight, meta) in enumerate(zip(output_heatmaps, targets, target_weights, metas)):
+        for view, (input, output_heatmap, target, target_weight, meta) in enumerate(zip(inputs, output_heatmaps, targets, target_weights, metas)):
             _, avg_acc, cnt, pred = accuracy(output_heatmap.detach().cpu().numpy(),
                                              target.detach().cpu().numpy())
             acc.update(avg_acc, cnt)
