@@ -142,6 +142,7 @@ class LimbLengthLoss(nn.Module):
     def get_normal_limb_length(self, output):
         parent = torch.index_select(output, 1, torch.cuda.LongTensor([item[0] for item in self.human36_edge]))
         child = torch.index_select(output, 1, torch.cuda.LongTensor([item[1] for item in self.human36_edge]))
+
         dist = ((parent-child) ** 2).sum(dim=2) ** 0.5
         norm_dist = dist / dist.mean()
         return norm_dist
@@ -163,10 +164,9 @@ class LimbLengthLoss(nn.Module):
 
 
 class MultiViewConsistencyLoss(nn.Module):
-    def __init__(self, use_target_weight):
+    def __init__(self):
         super(MultiViewConsistencyLoss, self).__init__()
         self.criterion = nn.MSELoss(reduction='mean')
-        self.use_target_weight = use_target_weight
         self.human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
                              (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
         self.human36_root = {
@@ -189,23 +189,40 @@ class MultiViewConsistencyLoss(nn.Module):
             19: 18,
         }
 
-    def get_kinematic_chain_space(self, output):
+    def get_pitch_yaw(self, output):
+        x = output[:, :, 0]
+        y = output[:, :, 1]
+        z = output[:, :, 2]
+
+        yaw = torch.atan2(x, z)
+        padj = (x ** 2 + z ** 2) ** 0.5
+        pitch = torch.atan2(padj, y)
+        return torch.cat((pitch.unsqueeze(2), yaw.unsqueeze(2)), 2)
+
+    def get_global_angle(self, output):
+        grand_parent = torch.index_select(output, 1, torch.cuda.LongTensor(
+            [self.human36_root[item[0]] for item in self.human36_edge]))
         parent = torch.index_select(output, 1, torch.cuda.LongTensor([item[0] for item in self.human36_edge]))
         child = torch.index_select(output, 1, torch.cuda.LongTensor([item[1] for item in self.human36_edge]))
 
-        joint_3d_vector = parent - child
-        kcs = joint_3d_vector.bmm(joint_3d_vector.transpose(1, 2))
-        return kcs
+        parent_vector = grand_parent - parent
+        child_vector = parent - child
 
-    def forward(self, joints_3ds, output_weights, target_weights):
+        parent_py = self.get_pitch_yaw(parent_vector)
+        child_py = self.get_pitch_yaw(child_vector)
+        return child_py - parent_py
+
+    def forward(self, joints_3ds):
         root_joints_3d = joints_3ds[0]
         num_edge = root_joints_3d.size(1)
-        root_kcs = self.get_kinematic_chain_space(root_joints_3d)
+        root_angle = self.get_global_angle(root_joints_3d)
         loss = 0
-        for joints_3d, output_weight, target_weight in zip(joints_3ds[1:], output_weights[1:], target_weights[1:]):
-            kcs = self.get_kinematic_chain_space(joints_3d)
-            loss += self.criterion(kcs, root_kcs)
-        return loss / num_edge
+        cnt = 0
+        for joints_3d in joints_3ds[1:]:
+            angle = self.get_global_angle(joints_3d)
+            loss += self.criterion(root_angle, angle)
+            cnt += 1
+        return (loss / num_edge) / cnt
 
 
 class WeaklySupervisedLoss(nn.Module):
@@ -213,25 +230,21 @@ class WeaklySupervisedLoss(nn.Module):
         super(WeaklySupervisedLoss, self).__init__()
         self.criterion1 = JointsMSELoss(use_target_weight)
         self.criterion2 = LimbLengthLoss()
-        self.criterion3 = MultiViewConsistencyLoss(use_target_weight)
+        self.criterion3 = MultiViewConsistencyLoss()
 
         self.use_target_weight = use_target_weight
         self.alpha = 1.0
         self.beta = 1.0
 
     def forward(self, hm_outputs, dm_outputs, targets, target_weights, limb):
-        joints_mse_loss = 0
-        limb_length_loss = 0
-        multiview_consistency_loss = 0
-        cnt = 0
+        joints_mse_loss = 0.0
+        limb_length_loss = 0.0
+        multiview_consistency_loss = 0.0
         joints_3ds, pred_weights = [], []
         for heatmap, depthmap, target, target_weight in zip(hm_outputs, dm_outputs, targets, target_weights):
             joints_3d, pred_weight = get_3d_joints(heatmap, depthmap)
             joints_mse_loss += self.criterion1(heatmap, target, target_weight)
-            #multiview_consistency_loss += self.criterion3(joints_3ds, pred_weights, target_weights)
             limb_length_loss += self.criterion2(joints_3d, limb, pred_weight)
-            #joints_3ds.append(joints_3d)
-            #pred_weights.append(pred_weight)
-            #cnt += 1
-        #multiview_consistency_loss += self.criterion3(joints_3ds, pred_weights, target_weights)
-        return joints_mse_loss + limb_length_loss #+ self.alpha * multiview_consistency_loss
+            joints_3ds.append(joints_3d)
+        multiview_consistency_loss += self.criterion3(joints_3ds)
+        return joints_mse_loss + limb_length_loss + multiview_consistency_loss
