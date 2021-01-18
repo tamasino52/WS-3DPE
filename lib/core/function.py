@@ -64,13 +64,6 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         batch_time.update(time.time() - end)
         end = time.time()
 
-        for view, (input, output_heatmap, target, target_weight, meta) in enumerate(zip(inputs, output_heatmaps, targets, target_weights, metas)):
-            _, avg_acc, cnt, pred = accuracy(output_heatmap.detach().cpu().numpy(),
-                                             target.detach().cpu().numpy())
-            acc.update(avg_acc, cnt)
-
-            prefix = '{}_{}_{}'.format(os.path.join(output_dir, 'train'), i, view)
-            save_debug_images(config, input, meta, target, pred * 4, output_heatmap, prefix)
 
         if i % config.PRINT_FREQ == 0:
             msg = 'Epoch: [{0}][{1}/{2}]\t' \
@@ -83,6 +76,15 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
                 speed=inputs[0].size(0) * len(inputs) / batch_time.val,
                 data_time=data_time, loss=losses, acc=acc)
             logger.info(msg)
+
+            for view, (input, output_heatmap, target, target_weight, meta) in enumerate(
+                    zip(inputs, output_heatmaps, targets, target_weights, metas)):
+                _, avg_acc, cnt, pred = accuracy(output_heatmap.detach().cpu().numpy(),
+                                                 target.detach().cpu().numpy())
+                acc.update(avg_acc, cnt)
+
+                prefix = '{}_{}_{}'.format(os.path.join(output_dir, 'train'), i, view)
+                save_debug_images(config, input, meta, target, pred * 4, output_heatmap, prefix)
 
             writer = writer_dict['writer']
             global_steps = writer_dict['train_global_steps']

@@ -41,7 +41,7 @@ from lib.core.function import train
 from lib.core.function import validate
 
 # Models
-from lib.core.loss import WeaklySupervisedLoss
+from lib.core.loss import WeaklySupervisedLoss, JointsMSELoss
 from lib.models.pose_hrnet import get_pose_net
 from lib.models.multiview_pose_hrnet import get_multiview_pose_net
 
@@ -89,12 +89,11 @@ def reset_config(config, args):
 
 
 def main():
-    final_output_dir = 'output'
     args = parse_args()
     reset_config(config, args)
 
+    # Set logger
     logger, final_output_dir, tb_log_dir = create_logger(config, 'train')
-
     logger.info(pprint.pformat(config))
 
     # CuDNN
@@ -105,33 +104,34 @@ def main():
     # Single HRNet Model
     pose_hrnet = get_pose_net(config, is_pretrain=True)  # Pose estimation model
     depth_hrnet = get_pose_net(config, is_pretrain=False)  # 2.5D depth prediction model
-    #pose_hrnet.load_state_dict(torch.load(config.NETWORK.PRETRAINED), strict=False)  # Pretrained weight loading
-
-    # Multiview adopting
-    mv_hrnet = get_multiview_pose_net(pose_hrnet, depth_hrnet, config)
 
     # Multi GPUs Setting
     gpus = [int(i) for i in config.GPUS.split(',')]
-    mv_hrnet = torch.nn.DataParallel(mv_hrnet, device_ids=gpus).cuda()
-    logger.info('=> parallelize model')
+    pose_hrnet.cuda(gpus[0])
+    depth_hrnet.cuda(gpus[1])
+    logger.info('=> load model to cuda')
 
     # Loss
-    criterion = WeaklySupervisedLoss(use_target_weight=config.LOSS.USE_TARGET_WEIGHT).cuda()
-    logger.info('=> init criterion')
+    pose_criterion = JointsMSELoss(use_target_weight=config.LOSS.USE_TARGET_WEIGHT).cuda()
+    depth_criterion = WeaklySupervisedLoss(use_target_weight=config.LOSS.USE_TARGET_WEIGHT).cuda()
+    logger.info('=> initialize criterion')
 
     # Optimizer
-    optimizer = get_optimizer(config, mv_hrnet)
-    logger.info('=> init {} optimizer'.format(config.TRAIN.OPTIMIZER))
+    pose_optimizer = get_optimizer(config, pose_criterion)
+    depth_optimizer = get_optimizer(config, depth_criterion)
+    logger.info('=> initialize {} optimizer'.format(config.TRAIN.OPTIMIZER))
 
     # Loading checkpoint
     start_epoch = config.TRAIN.BEGIN_EPOCH
     if config.TRAIN.RESUME:
-        start_epoch, mv_hrnet, optimizer = load_checkpoint(mv_hrnet, optimizer, final_output_dir)
+        start_epoch, depth_hrnet, depth_optimizer = load_checkpoint(depth_hrnet, depth_optimizer, final_output_dir)
 
     # Scheduler
-    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        optimizer, config.TRAIN.LR_STEP, config.TRAIN.LR_FACTOR)
-    logger.info('=> init scheduler')
+    pose_lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        pose_optimizer, config.TRAIN.LR_STEP, config.TRAIN.LR_FACTOR)
+    depth_lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        depth_optimizer, config.TRAIN.LR_STEP, config.TRAIN.LR_FACTOR)
+    logger.info('=> initialize scheduler')
 
     # Summary
     writer_dict = {
@@ -171,12 +171,14 @@ def main():
     best_perf = 0.0
     best_model = False
     for epoch in range(start_epoch, config.TRAIN.END_EPOCH):
-        lr_scheduler.step()
+        pose_lr_scheduler.step()
+        depth_lr_scheduler.step()
 
         # Trainer
         train(config,
               train_loader,
-              mv_hrnet,
+              pose_hrnet,
+              depth_hrnet
               criterion,
               optimizer,
               epoch,

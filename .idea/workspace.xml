@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="Limb Length Loss added">
+    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="수정">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/function.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/function.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/loss.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/loss.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/models/multiview_pose_hrnet.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/models/multiview_pose_hrnet.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -203,7 +207,14 @@
       <option name="project" value="LOCAL" />
       <updated>1610632426423</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="수정">
+      <created>1610701920034</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1610701920034</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -227,7 +238,8 @@
     <MESSAGE value="버그픽스" />
     <MESSAGE value="손실함수 수" />
     <MESSAGE value="Limb Length Loss added" />
-    <option name="LAST_COMMIT_MESSAGE" value="Limb Length Loss added" />
+    <MESSAGE value="수정" />
+    <option name="LAST_COMMIT_MESSAGE" value="수정" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -238,34 +250,29 @@
           <option name="timeStamp" value="91" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/lib/core/function.py</url>
-          <line>74</line>
-          <option name="timeStamp" value="123" />
+          <url>file://$PROJECT_DIR$/lib/models/multiview_pose_hrnet.py</url>
+          <line>81</line>
+          <option name="timeStamp" value="244" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/lib/core/loss.py</url>
-          <line>248</line>
-          <option name="timeStamp" value="166" />
+          <url>file://$PROJECT_DIR$/lib/models/multiview_pose_hrnet.py</url>
+          <line>92</line>
+          <option name="timeStamp" value="256" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/lib/core/loss.py</url>
-          <line>249</line>
-          <option name="timeStamp" value="167" />
+          <url>file://$PROJECT_DIR$/lib/models/multiview_pose_hrnet.py</url>
+          <line>94</line>
+          <option name="timeStamp" value="257" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/lib/core/loss.py</url>
-          <line>222</line>
-          <option name="timeStamp" value="191" />
+          <url>file://$PROJECT_DIR$/lib/models/multiview_pose_hrnet.py</url>
+          <line>96</line>
+          <option name="timeStamp" value="258" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/lib/core/loss.py</url>
-          <line>224</line>
-          <option name="timeStamp" value="192" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/lib/core/loss.py</url>
-          <line>199</line>
-          <option name="timeStamp" value="194" />
+          <url>file://$PROJECT_DIR$/main.py</url>
+          <line>129</line>
+          <option name="timeStamp" value="259" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>
@@ -276,13 +283,5 @@
         </breakpoint>
       </default-breakpoints>
     </breakpoint-manager>
-    <watches-manager>
-      <configuration name="PythonConfigurationType">
-        <watch expression="dot_edge" />
-      </configuration>
-      <inline-watch fileUrl="file://$PROJECT_DIR$/lib/core/loss.py" line="47">
-        <watch expression="maxvals" />
-      </inline-watch>
-    </watches-manager>
   </component>
 </project>

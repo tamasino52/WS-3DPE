@@ -36,29 +36,17 @@ def get_3d_joints(batch_heatmap, batch_depthmap):
     for h, d in zip(batch_heatmap.shape, batch_depthmap.shape):
         assert h is d, 'Heatmap and Depthmap have different shapes.'
 
-    batch_size = batch_heatmap.shape[0]
-    num_joints = batch_heatmap.shape[1]
-    width = batch_heatmap.shape[3]
-    heatmap_reshaped = batch_heatmap.view(batch_size, num_joints, -1)
-    depthmap_reshaped = batch_depthmap.view(batch_size, num_joints, -1)
+    max_vals, row_idx = batch_heatmap.max(2)
+    max_vals, col_idx = max_vals.max(2)
 
-    maxvals, idx = torch.max(heatmap_reshaped, 2)
-    depths = torch.take(depthmap_reshaped, idx)
+    depth = torch.take(batch_depthmap, row_idx)
+    depth = torch.take(depth, col_idx)
 
-    maxvals = maxvals.view(batch_size, num_joints, 1)
-    idx = idx.view(batch_size, num_joints, 1)
-    depths = depths.view(batch_size, num_joints)
-
-    preds = idx.repeat_interleave(3, 2).type(torch.float32)
-    preds[:, :, 0] = (preds[:, :, 0]) % width
-    preds[:, :, 1] = torch.floor((preds[:, :, 1]) / width)
-    preds[:, :, 2] = depths
-
-    pred_mask = torch.gt(maxvals, 0.0).repeat_interleave(3, 2)
-    pred_mask = pred_mask.type(torch.float32)
-
-    preds *= pred_mask
-    return preds, maxvals
+    row_idx = row_idx.take(col_idx).type(torch.float32)
+    col_idx = col_idx.float()
+    points_3d = torch.cat((row_idx.unsqueeze(2), col_idx.unsqueeze(2), depth.unsqueeze(2)), 2)
+    max_vals[max_vals < 0] = 0.0
+    return points_3d, max_vals
 
 
 class JointsMSELoss(nn.Module):
@@ -144,7 +132,7 @@ class LimbLengthLoss(nn.Module):
         child = torch.index_select(output, 1, torch.cuda.LongTensor([item[1] for item in self.human36_edge]))
 
         dist = ((parent-child) ** 2).sum(dim=2) ** 0.5
-        norm_dist = dist / dist.mean()
+        norm_dist = dist / dist[dist > 0].mean()
         return norm_dist
 
     def get_limb_weight(self, output_weight):
@@ -155,12 +143,8 @@ class LimbLengthLoss(nn.Module):
     def forward(self, output, target, output_weight):
         length_weight = self.get_limb_weight(output_weight)
         length_pred = self.get_normal_limb_length(output)
-        batch_size = length_pred.shape[0]
-        num_edges = length_pred.shape[1]
-        length_pred = length_pred.reshape((batch_size, num_edges, -1))
-        length_gt = target.reshape((batch_size, num_edges, -1))
-        loss = ((length_pred - length_gt) ** 2).mul(length_weight).sum()
-        return loss / num_edges
+        loss = ((length_pred - target) ** 2).mul(length_weight).sum()
+        return loss
 
 
 class MultiViewConsistencyLoss(nn.Module):
@@ -246,5 +230,59 @@ class WeaklySupervisedLoss(nn.Module):
             joints_mse_loss += self.criterion1(heatmap, target, target_weight)
             limb_length_loss += self.criterion2(joints_3d, limb, pred_weight)
             joints_3ds.append(joints_3d)
-        multiview_consistency_loss += self.criterion3(joints_3ds)
-        return joints_mse_loss + limb_length_loss + multiview_consistency_loss
+        #multiview_consistency_loss += self.criterion3(joints_3ds)
+        return joints_mse_loss + limb_length_loss #+ multiview_consistency_loss
+
+
+class JointMPJPELoss(nn.Module):
+    def __init__(self):
+        super(JointMPJPELoss, self).__init__()
+
+    def forward(self, joint_3d, gt, joints_vis_3d=None, output_batch_mpjpe=False):
+        """
+        :param joint_3d: (batch, njoint, 3)
+        :param gt:
+        :param joints_vis_3d: (batch, njoint, 1), values are 0,1
+        :param output_batch_mpjpe: bool
+        :return:
+        """
+        if joints_vis_3d is None:
+            joints_vis_3d = torch.ones_like(joint_3d)[:,:,0:1]
+        l2_distance = torch.sqrt(((joint_3d - gt)**2).sum(dim=2))
+        joints_vis_3d = joints_vis_3d.view(*l2_distance.shape)
+        masked_l2_distance = l2_distance * joints_vis_3d
+        n_valid_joints = torch.sum(joints_vis_3d, dim=1)
+        # if (n_valid_joints < 1).sum() > 0:
+        n_valid_joints[n_valid_joints < 1] = 1  # avoid div 0
+        avg_mpjpe = torch.sum(masked_l2_distance) / n_valid_joints.sum()
+        if output_batch_mpjpe:
+            return avg_mpjpe, masked_l2_distance, n_valid_joints.sum()
+        else:
+            return avg_mpjpe, n_valid_joints.sum()
+
+
+class Joint2dSmoothLoss(nn.Module):
+    def __init__(self):
+        super(Joint2dSmoothLoss, self).__init__()
+        factor = torch.as_tensor(8.0)
+        alpha = torch.as_tensor(-10.0)
+        self.register_buffer('factor', factor)
+        self.register_buffer('alpha', alpha)
+
+    def forward(self, joint_2d, gt, target_weight=None):
+        """
+        :param joint_2d: (batch*nview, njoint, 2)
+        :param gt:
+        :param target_weight: (batch*nview, njoint, 1)
+        :return:
+        """
+        x = torch.sum(torch.abs(joint_2d - gt), dim=2)  # (batch*nview, njoint)
+        x_scaled = ((x / self.factor) ** 2 / torch.abs(self.alpha-2) + 1) ** (self.alpha * 0.5) -1
+        x_final = (torch.abs(self.alpha) - 2) / self.alpha * x_scaled
+
+        loss = x_final
+        if target_weight is not None:
+            cond = torch.squeeze(target_weight) < 0.5
+            loss = torch.where(cond, torch.zeros_like(loss), loss)
+        loss_mean = loss.mean()
+        return loss_mean * 1000.0

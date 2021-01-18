@@ -72,7 +72,7 @@ config.NETWORK.HEATMAP_SIZE = np.array([64, 64])
 config.NETWORK.IMAGE_SIZE = np.array([256, 256])
 config.NETWORK.SIGMA = 2
 config.NETWORK.TARGET_TYPE = 'gaussian'
-config.NETWORK.AGGRE = True
+config.NETWORK.AGGRE = False
 
 """
 # pose_resnet related params

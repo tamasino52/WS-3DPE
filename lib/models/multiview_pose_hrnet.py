@@ -87,12 +87,12 @@ class MultiViewPose(nn.Module):
                 depthmaps = self.dm_hrnet(view)
                 single_hm_views.append(heatmaps)
                 single_dm_views.append(depthmaps)
-            hm_multi_views = []
-            dm_multi_views = []
             if self.config.NETWORK.AGGRE:
                 hm_multi_views = self.aggre_layer(single_hm_views)
                 dm_multi_views = self.aggre_layer(single_dm_views)
-            return hm_multi_views, dm_multi_views
+                return hm_multi_views, dm_multi_views
+            else:
+                return single_hm_views, single_dm_views
         else:
             return self.hm_hrnet(views), self.dm_hrnet(views)
 
