@@ -23,7 +23,7 @@ config.BACKBONE_MODEL = 'pose_hrnet'
 config.MODEL = 'multiview_pose_hrnet'
 config.GPUS = '0,1'
 config.WORKERS = 24
-config.PRINT_FREQ = 100
+config.PRINT_FREQ = 10
 
 # hrnet definition
 config.MODEL_EXTRA = edict()
@@ -124,12 +124,12 @@ config.TRAIN.END_EPOCH = 210
 
 config.TRAIN.RESUME = False
 
-config.TRAIN.BATCH_SIZE = 3
+config.TRAIN.BATCH_SIZE = 2
 config.TRAIN.SHUFFLE = True
 
 # testing
 config.TEST = edict()
-config.TEST.BATCH_SIZE = 3
+config.TEST.BATCH_SIZE = 2
 config.TEST.STATE = ''
 config.TEST.POST_PROCESS = True
 config.TEST.SHIFT_HEATMAP = True

@@ -46,7 +46,7 @@ def get_3d_joints(batch_heatmap, batch_depthmap):
     col_idx = col_idx.float()
     points_3d = torch.cat((row_idx.unsqueeze(2), col_idx.unsqueeze(2), depth.unsqueeze(2)), 2)
     max_vals[max_vals < 0] = 0.0
-    return points_3d, max_vals
+    return points_3d, max_vals.unsqueeze(2)
 
 
 class JointsMSELoss(nn.Module):
@@ -126,24 +126,31 @@ class LimbLengthLoss(nn.Module):
         super(LimbLengthLoss, self).__init__()
         self.human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
                              (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
+        self.criterion = nn.MSELoss(reduction='mean')
 
-    def get_normal_limb_length(self, output):
+    def get_normal_limb_length(self, output, target_weight):
         parent = torch.index_select(output, 1, torch.cuda.LongTensor([item[0] for item in self.human36_edge]))
         child = torch.index_select(output, 1, torch.cuda.LongTensor([item[1] for item in self.human36_edge]))
-
-        dist = ((parent-child) ** 2).sum(dim=2) ** 0.5
-        norm_dist = dist / dist[dist > 0].mean()
-        return norm_dist
+        dist = ((parent - child) ** 2).sum(dim=2) ** 0.5
+        scale = dist.unsqueeze(2)[target_weight > 0].mean()
+        return (dist / scale).unsqueeze(2)
 
     def get_limb_weight(self, output_weight):
         parent = torch.index_select(output_weight, 1, torch.cuda.LongTensor([item[0] for item in self.human36_edge]))
         child = torch.index_select(output_weight, 1, torch.cuda.LongTensor([item[1] for item in self.human36_edge]))
         return parent.mul(child)
 
-    def forward(self, output, target, output_weight):
-        length_weight = self.get_limb_weight(output_weight)
-        length_pred = self.get_normal_limb_length(output)
-        loss = ((length_pred - target) ** 2).mul(length_weight).sum()
+    def forward(self, output, target, output_weight, target_weight):
+        loss = 0
+        output_weight = self.get_limb_weight(output_weight)
+        target_weight = self.get_limb_weight(target_weight)
+        length_weight = output_weight.mul(target_weight)
+        length_pred = self.get_normal_limb_length(output, length_weight)
+
+        loss += self.criterion(
+            length_pred[length_weight.squeeze() > 0],
+            target[length_weight.squeeze() > 0]
+        )
         return loss
 
 
@@ -217,21 +224,20 @@ class WeaklySupervisedLoss(nn.Module):
         self.criterion3 = MultiViewConsistencyLoss()
 
         self.use_target_weight = use_target_weight
-        self.alpha = 1.0
-        self.beta = 1.0
+        self.alpha = 0.1
 
     def forward(self, hm_outputs, dm_outputs, targets, target_weights, limb):
-        joints_mse_loss = 0.0
         limb_length_loss = 0.0
         multiview_consistency_loss = 0.0
+        joint_mse_loss = 0.0
         joints_3ds, pred_weights = [], []
         for heatmap, depthmap, target, target_weight in zip(hm_outputs, dm_outputs, targets, target_weights):
             joints_3d, pred_weight = get_3d_joints(heatmap, depthmap)
-            joints_mse_loss += self.criterion1(heatmap, target, target_weight)
-            limb_length_loss += self.criterion2(joints_3d, limb, pred_weight)
+            joint_mse_loss += self.criterion1(heatmap, target, target_weight)
+            limb_length_loss += self.criterion2(joints_3d, limb, pred_weight, target_weight)
             joints_3ds.append(joints_3d)
-        #multiview_consistency_loss += self.criterion3(joints_3ds)
-        return joints_mse_loss + limb_length_loss #+ multiview_consistency_loss
+        multiview_consistency_loss += self.criterion3(joints_3ds)
+        return joint_mse_loss + self.alpha * limb_length_loss #+ self.alpha * multiview_consistency_loss
 
 
 class JointMPJPELoss(nn.Module):

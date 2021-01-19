@@ -11,6 +11,7 @@ import pprint
 import shutil
 
 import torch
+import torch.nn as nn
 import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
@@ -43,7 +44,7 @@ from lib.core.function import validate
 # Models
 from lib.core.loss import WeaklySupervisedLoss, JointsMSELoss
 from lib.models.pose_hrnet import get_pose_net
-from lib.models.multiview_pose_hrnet import get_multiview_pose_net
+from lib.models.multiview_pose_hrnet import *
 
 # Datasets
 from lib.dataset.h36m import H36MDataset
@@ -102,35 +103,31 @@ def main():
     cudnn.enabled = config.CUDNN.ENABLED
 
     # Single HRNet Model
-    pose_hrnet = get_pose_net(config, is_pretrain=True)  # Pose estimation model
-    depth_hrnet = get_pose_net(config, is_pretrain=False)  # 2.5D depth prediction model
+    pose_hrnet = get_pose_net(config, is_pretrain=False)
+    pose_hrnet.init_weights(config['NETWORK']['PRETRAINED'])
+    depth_hrnet = get_pose_net(config, is_pretrain=False)
+    mv_hrnet = HRNetEnsemble(pose_hrnet, depth_hrnet)
 
     # Multi GPUs Setting
     gpus = [int(i) for i in config.GPUS.split(',')]
-    pose_hrnet.cuda(gpus[0])
-    depth_hrnet.cuda(gpus[1])
+    mv_hrnet = nn.DataParallel(mv_hrnet, device_ids=gpus).cuda()
     logger.info('=> load model to cuda')
 
     # Loss
-    pose_criterion = JointsMSELoss(use_target_weight=config.LOSS.USE_TARGET_WEIGHT).cuda()
-    depth_criterion = WeaklySupervisedLoss(use_target_weight=config.LOSS.USE_TARGET_WEIGHT).cuda()
+    criterion = WeaklySupervisedLoss(use_target_weight=config.LOSS.USE_TARGET_WEIGHT).cuda()
     logger.info('=> initialize criterion')
 
     # Optimizer
-    pose_optimizer = get_optimizer(config, pose_criterion)
-    depth_optimizer = get_optimizer(config, depth_criterion)
+    optimizer = get_optimizer(config, mv_hrnet)
     logger.info('=> initialize {} optimizer'.format(config.TRAIN.OPTIMIZER))
 
     # Loading checkpoint
     start_epoch = config.TRAIN.BEGIN_EPOCH
     if config.TRAIN.RESUME:
-        start_epoch, depth_hrnet, depth_optimizer = load_checkpoint(depth_hrnet, depth_optimizer, final_output_dir)
+        start_epoch, mv_hrnet, optimizer = load_checkpoint(mv_hrnet, optimizer, final_output_dir)
 
     # Scheduler
-    pose_lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        pose_optimizer, config.TRAIN.LR_STEP, config.TRAIN.LR_FACTOR)
-    depth_lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        depth_optimizer, config.TRAIN.LR_STEP, config.TRAIN.LR_FACTOR)
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, config.TRAIN.LR_STEP, config.TRAIN.LR_FACTOR)
     logger.info('=> initialize scheduler')
 
     # Summary
@@ -171,30 +168,28 @@ def main():
     best_perf = 0.0
     best_model = False
     for epoch in range(start_epoch, config.TRAIN.END_EPOCH):
-        pose_lr_scheduler.step()
-        depth_lr_scheduler.step()
+        lr_scheduler.step()
 
         # Trainer
-        train(config,
-              train_loader,
-              pose_hrnet,
-              depth_hrnet
-              criterion,
-              optimizer,
-              epoch,
-              final_output_dir,
-              tb_log_dir,
-              writer_dict)
+        train(config=config,
+              train_loader=train_loader,
+              model=mv_hrnet,
+              criterion=criterion,
+              optimizer=optimizer,
+              epoch=epoch,
+              output_dir=final_output_dir,
+              tb_log_dir=tb_log_dir,
+              writer_dict=writer_dict)
 
         # Performance indicator
-        perf_indicator = validate(config,
-                                  valid_loader,
-                                  valid_dataset,
-                                  mv_hrnet,
-                                  criterion,
-                                  final_output_dir,
-                                  tb_log_dir,
-                                  writer_dict)
+        perf_indicator = validate(config=config,
+                                  val_loader=valid_loader,
+                                  val_dataset=valid_dataset,
+                                  model=mv_hrnet,
+                                  criterion=criterion,
+                                  output_dir=final_output_dir,
+                                  tb_log_dir=tb_log_dir,
+                                  writer_dict=writer_dict)
 
         if perf_indicator > best_perf:
             best_perf = perf_indicator

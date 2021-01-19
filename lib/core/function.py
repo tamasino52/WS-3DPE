@@ -19,15 +19,13 @@ from core.evaluate import accuracy
 from core.inference import get_final_preds
 from core.inference import get_max_preds
 
-from utils.transforms import flip_back
 from utils.vis import save_debug_images
 
 
 logger = logging.getLogger(__name__)
 
 
-def train(config, train_loader, model, criterion, optimizer, epoch,
-          output_dir, tb_log_dir, writer_dict):
+def train(config, train_loader, model, criterion, optimizer, epoch, output_dir, tb_log_dir, writer_dict):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -37,54 +35,53 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
     model.train()
 
     end = time.time()
-    for i, (inputs, targets, target_weights, metas, limb) in enumerate(train_loader):
+    for i, data in enumerate(train_loader):
+        inputs, targets, target_weights, metas, limb = data
         # measure data loading time
         data_time.update(time.time() - end)
-
-        # compute output
-        output_heatmaps, output_depthmaps = model(inputs)
 
         # load on cuda
         targets = [target.cuda(non_blocking=True) for target in targets]
         target_weights = [target_weight.cuda(non_blocking=True) for target_weight in target_weights]
         limb = limb.cuda(non_blocking=True)
 
-        # compute gradient and do update step
-        loss = criterion(output_heatmaps, output_depthmaps, targets, target_weights, limb)
+        output_heatmaps = []
+        output_depthmaps = []
 
-        # compute gradient and do update step
+        for v, (input, target, target_weight, meta) in enumerate(zip(inputs, targets, target_weights, metas)):
+            output_heatmap, output_depthmap = model(input)
+            output_heatmaps.append(output_heatmap)
+            output_depthmaps.append(output_depthmap)
+
+        loss = criterion(output_heatmaps, output_depthmaps, targets, target_weights, limb)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        # measure accuracy and record loss
         losses.update(loss.item(), len(inputs) * inputs[0].size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
 
-
         if i % config.PRINT_FREQ == 0:
+            _, avg_acc, cnt, pred = accuracy(output_heatmap.detach().cpu().numpy(), target.detach().cpu().numpy())
+            acc.update(avg_acc, cnt)
+            prefix = '{}_{}'.format(os.path.join(output_dir, 'train'), i)
+            save_debug_images(config, input, meta, target, pred * 4, output_heatmap, output_depthmap, prefix)
             msg = 'Epoch: [{0}][{1}/{2}]\t' \
                   'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t' \
                   'Speed {speed:.1f} samples/s\t' \
                   'Data {data_time.val:.3f}s ({data_time.avg:.3f}s)\t' \
                   'Loss {loss.val:.5f} ({loss.avg:.5f})\t' \
                   'Accuracy {acc.val:.3f} ({acc.avg:.3f})'.format(
-                epoch, i, len(train_loader), batch_time=batch_time,
-                speed=inputs[0].size(0) * len(inputs) / batch_time.val,
-                data_time=data_time, loss=losses, acc=acc)
+                    epoch, i, len(train_loader),
+                    batch_time=batch_time,
+                    speed=inputs[0].size(0) * len(inputs) / batch_time.val,
+                    data_time=data_time,
+                    loss=losses,
+                    acc=acc)
             logger.info(msg)
-
-            for view, (input, output_heatmap, target, target_weight, meta) in enumerate(
-                    zip(inputs, output_heatmaps, targets, target_weights, metas)):
-                _, avg_acc, cnt, pred = accuracy(output_heatmap.detach().cpu().numpy(),
-                                                 target.detach().cpu().numpy())
-                acc.update(avg_acc, cnt)
-
-                prefix = '{}_{}_{}'.format(os.path.join(output_dir, 'train'), i, view)
-                save_debug_images(config, input, meta, target, pred * 4, output_heatmap, prefix)
 
             writer = writer_dict['writer']
             global_steps = writer_dict['train_global_steps']
@@ -93,8 +90,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
             writer_dict['train_global_steps'] = global_steps + 1
 
 
-def validate(config, val_loader, val_dataset, model, criterion, output_dir,
-             tb_log_dir, writer_dict=None):
+def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_log_dir, writer_dict=None):
     batch_time = AverageMeter()
     losses = AverageMeter()
     acc = AverageMeter()

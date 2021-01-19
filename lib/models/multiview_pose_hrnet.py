@@ -102,3 +102,15 @@ def get_multiview_pose_net(hm_hrnet, dm_hrnet, CFG):
     model = MultiViewPose(hm_hrnet, dm_hrnet, Aggre, CFG)
     return model
 
+
+class HRNetEnsemble(nn.Module):
+    def __init__(self, modelA, modelB):
+        super(HRNetEnsemble, self).__init__()
+        self.modelA = modelA
+        self.modelB = modelB
+
+    def forward(self, x):
+        x1 = self.modelA(x)
+        x2 = self.modelB(x)
+        return x1, x2
+
