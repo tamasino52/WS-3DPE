@@ -131,9 +131,9 @@ class LimbLengthLoss(nn.Module):
     def get_normal_limb_length(self, output, target_weight):
         parent = torch.index_select(output, 1, torch.cuda.LongTensor([item[0] for item in self.human36_edge]))
         child = torch.index_select(output, 1, torch.cuda.LongTensor([item[1] for item in self.human36_edge]))
-        dist = ((parent - child) ** 2).sum(dim=2) ** 0.5
-        scale = dist.unsqueeze(2)[target_weight > 0].mean()
-        return (dist / scale).unsqueeze(2)
+        dist = torch.norm(parent-child, dim=2).unsqueeze(2)
+        scale = dist[target_weight > 0].mean()
+        return dist / scale
 
     def get_limb_weight(self, output_weight):
         parent = torch.index_select(output_weight, 1, torch.cuda.LongTensor([item[0] for item in self.human36_edge]))
@@ -146,10 +146,11 @@ class LimbLengthLoss(nn.Module):
         target_weight = self.get_limb_weight(target_weight)
         length_weight = output_weight.mul(target_weight)
         length_pred = self.get_normal_limb_length(output, length_weight)
+        length_target = self.get_normal_limb_length(target, target_weight)
 
         loss += self.criterion(
-            length_pred[length_weight.squeeze() > 0],
-            target[length_weight.squeeze() > 0]
+            length_pred[length_weight > 0],
+            length_target[length_weight > 0]
         )
         return loss
 
@@ -222,9 +223,10 @@ class WeaklySupervisedLoss(nn.Module):
         self.criterion1 = JointsMSELoss(use_target_weight)
         self.criterion2 = LimbLengthLoss()
         self.criterion3 = MultiViewConsistencyLoss()
-
+        self.mse = nn.MSELoss(reduction='mean')
         self.use_target_weight = use_target_weight
-        self.alpha = 0.1
+        self.alpha = 10
+        self.beta = 100
 
     def forward(self, hm_outputs, dm_outputs, targets, target_weights, limb):
         limb_length_loss = 0.0
@@ -237,7 +239,7 @@ class WeaklySupervisedLoss(nn.Module):
             limb_length_loss += self.criterion2(joints_3d, limb, pred_weight, target_weight)
             joints_3ds.append(joints_3d)
         multiview_consistency_loss += self.criterion3(joints_3ds)
-        return joint_mse_loss + self.alpha * limb_length_loss #+ self.alpha * multiview_consistency_loss
+        return joint_mse_loss + self.alpha * multiview_consistency_loss + self.beta * limb_length_loss
 
 
 class JointMPJPELoss(nn.Module):

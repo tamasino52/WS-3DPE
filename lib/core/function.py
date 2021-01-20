@@ -17,7 +17,6 @@ import torch
 
 from core.evaluate import accuracy
 from core.inference import get_final_preds
-from core.inference import get_max_preds
 
 from utils.vis import save_debug_images
 

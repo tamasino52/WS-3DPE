@@ -168,6 +168,7 @@ def main():
     best_perf = 0.0
     best_model = False
     for epoch in range(start_epoch, config.TRAIN.END_EPOCH):
+        optimizer.step()
         lr_scheduler.step()
 
         # Trainer
