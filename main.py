@@ -144,7 +144,7 @@ def main():
     train_dataset = MultiViewH36M(config, config.DATASET.TRAIN_SUBSET, True,
                                   transforms.Compose([transforms.ToTensor(), normalize]))
 
-    logger.info('=> loading validation dataset')
+    logger.info('=> loading valid dataset')
     valid_dataset = MultiViewH36M(config, config.DATASET.TEST_SUBSET, False,
                                   transforms.Compose([transforms.ToTensor(), normalize]))
 

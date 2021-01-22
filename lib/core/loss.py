@@ -10,6 +10,62 @@ from __future__ import print_function
 
 import torch
 import torch.nn as nn
+from torch_batch_svd import svd
+
+
+def batch_compute_similarity_transform_torch(S1, S2):
+    '''
+    Computes a similarity transform (sR, t) that takes
+    a set of 3D points S1 (3 x N) closest to a set of 3D points S2,
+    where R is an 3x3 rotation matrix, t 3x1 translation, s scale.
+    i.e. solves the orthogonal Procrutes problem.
+    '''
+    transposed = False
+    if S1.shape[0] != 3 and S1.shape[0] != 2:
+        S1 = S1.permute(0,2,1)
+        S2 = S2.permute(0,2,1)
+        transposed = True
+    assert(S2.shape[1] == S1.shape[1])
+
+    # 1. Remove mean.
+    mu1 = S1.mean(axis=-1, keepdims=True)
+    mu2 = S2.mean(axis=-1, keepdims=True)
+
+    X1 = S1 - mu1
+    X2 = S2 - mu2
+
+    # 2. Compute variance of X1 used for scale.
+    var1 = torch.sum(X1**2, dim=1).sum(dim=1)
+
+    # 3. The outer product of X1 and X2.
+    K = X1.bmm(X2.permute(0,2,1))
+
+    # 4. Solution that Maximizes trace(R'K) is R=U*V', where U, V are
+    # singular vectors of K.
+    U, s, V = svd(K)
+
+    # Construct Z that fixes the orientation of R to get det(R)=1.
+    Z = torch.eye(U.shape[1], device=S1.device).unsqueeze(0)
+    Z = Z.repeat(U.shape[0],1,1)
+    Z[:,-1, -1] *= torch.sign(torch.det(U.bmm(V.permute(0,2,1))))
+
+    # Construct R.
+    R = V.bmm(Z.bmm(U.permute(0,2,1)))
+
+    # 5. Recover scale.
+    scale = torch.cat([torch.trace(x).unsqueeze(0) for x in R.bmm(K)]) / var1
+
+    # 6. Recover translation.
+    t = mu2 - (scale.unsqueeze(-1).unsqueeze(-1) * (R.bmm(mu1)))
+
+    # 7. Error:
+    S1_hat = scale.unsqueeze(-1).unsqueeze(-1) * R.bmm(S1) + t
+
+    if transposed:
+        S1_hat = S1_hat.permute(0,2,1)
+
+    return S1_hat
+
 
 def get_max_preds(batch_heatmap):
     batch_size = batch_heatmap.shape[0]
@@ -128,12 +184,11 @@ class LimbLengthLoss(nn.Module):
                              (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
         self.criterion = nn.MSELoss(reduction='mean')
 
-    def get_normal_limb_length(self, output, target_weight):
+    def get_limb_length(self, output):
         parent = torch.index_select(output, 1, torch.cuda.LongTensor([item[0] for item in self.human36_edge]))
         child = torch.index_select(output, 1, torch.cuda.LongTensor([item[1] for item in self.human36_edge]))
         dist = torch.norm(parent-child, dim=2).unsqueeze(2)
-        scale = dist[target_weight > 0].mean()
-        return dist / scale
+        return dist
 
     def get_limb_weight(self, output_weight):
         parent = torch.index_select(output_weight, 1, torch.cuda.LongTensor([item[0] for item in self.human36_edge]))
@@ -142,16 +197,20 @@ class LimbLengthLoss(nn.Module):
 
     def forward(self, output, target, output_weight, target_weight):
         loss = 0
+        target = target.unsqueeze(2)
         output_weight = self.get_limb_weight(output_weight)
         target_weight = self.get_limb_weight(target_weight)
         length_weight = output_weight.mul(target_weight)
-        length_pred = self.get_normal_limb_length(output, length_weight)
-        length_target = self.get_normal_limb_length(target, target_weight)
+        length_pred = self.get_limb_length(output)
+
+        length_pred = length_pred / length_pred[length_weight > 0].mean(1)
+        length_target = target / target[length_weight > 0].mean(1)
 
         loss += self.criterion(
             length_pred[length_weight > 0],
             length_target[length_weight > 0]
         )
+
         return loss
 
 
@@ -161,60 +220,16 @@ class MultiViewConsistencyLoss(nn.Module):
         self.criterion = nn.MSELoss(reduction='mean')
         self.human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
                              (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
-        self.human36_root = {
-            0: 0,
-            1: 0,
-            2: 1,
-            3: 2,
-            4: 0,
-            5: 4,
-            6: 5,
-            7: 0,
-            9: 7,
-            11: 9,
-            12: 11,
-            14: 9,
-            15: 14,
-            16: 15,
-            17: 9,
-            18: 17,
-            19: 18,
-        }
-
-    def get_pitch_yaw(self, output):
-        x = output[:, :, 0]
-        y = output[:, :, 1]
-        z = output[:, :, 2]
-
-        yaw = torch.atan2(x, z)
-        padj = (x ** 2 + z ** 2) ** 0.5
-        pitch = torch.atan2(padj, y)
-        return torch.cat((pitch.unsqueeze(2), yaw.unsqueeze(2)), 2)
-
-    def get_global_angle(self, output):
-        grand_parent = torch.index_select(output, 1, torch.cuda.LongTensor(
-            [self.human36_root[item[0]] for item in self.human36_edge]))
-        parent = torch.index_select(output, 1, torch.cuda.LongTensor([item[0] for item in self.human36_edge]))
-        child = torch.index_select(output, 1, torch.cuda.LongTensor([item[1] for item in self.human36_edge]))
-
-        parent_vector = grand_parent - parent
-        child_vector = parent - child
-
-        parent_py = self.get_pitch_yaw(parent_vector)
-        child_py = self.get_pitch_yaw(child_vector)
-        return child_py - parent_py
 
     def forward(self, joints_3ds):
         root_joints_3d = joints_3ds[0]
-        num_edge = root_joints_3d.size(1)
-        root_angle = self.get_global_angle(root_joints_3d)
         loss = 0
         cnt = 0
         for joints_3d in joints_3ds[1:]:
-            angle = self.get_global_angle(joints_3d)
-            loss += self.criterion(root_angle, angle)
+            joints_3d_hat = batch_compute_similarity_transform_torch(joints_3d, root_joints_3d)
+            loss += self.criterion(joints_3d_hat, root_joints_3d)
             cnt += 1
-        return (loss / num_edge) / cnt
+        return loss / cnt
 
 
 class WeaklySupervisedLoss(nn.Module):
@@ -225,8 +240,8 @@ class WeaklySupervisedLoss(nn.Module):
         self.criterion3 = MultiViewConsistencyLoss()
         self.mse = nn.MSELoss(reduction='mean')
         self.use_target_weight = use_target_weight
-        self.alpha = 10
-        self.beta = 100
+        self.alpha = 0.1
+        self.beta = 0.01
 
     def forward(self, hm_outputs, dm_outputs, targets, target_weights, limb):
         limb_length_loss = 0.0
@@ -236,10 +251,10 @@ class WeaklySupervisedLoss(nn.Module):
         for heatmap, depthmap, target, target_weight in zip(hm_outputs, dm_outputs, targets, target_weights):
             joints_3d, pred_weight = get_3d_joints(heatmap, depthmap)
             joint_mse_loss += self.criterion1(heatmap, target, target_weight)
-            limb_length_loss += self.criterion2(joints_3d, limb, pred_weight, target_weight)
+            #limb_length_loss += self.criterion2(joints_3d, limb, pred_weight, target_weight)
             joints_3ds.append(joints_3d)
         multiview_consistency_loss += self.criterion3(joints_3ds)
-        return joint_mse_loss + self.alpha * multiview_consistency_loss + self.beta * limb_length_loss
+        return joint_mse_loss + self.alpha * multiview_consistency_loss #+ self.beta * limb_length_loss
 
 
 class JointMPJPELoss(nn.Module):
