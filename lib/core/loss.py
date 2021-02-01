@@ -11,6 +11,9 @@ from __future__ import print_function
 import torch
 import torch.nn as nn
 from torch_batch_svd import svd
+from lib.utils.vis import vis_3d_multiple_skeleton
+from lib.core.inference import get_max_preds
+from lib.utils.soft_argmax import SoftArgmax1D, SoftArgmax2D
 
 
 def batch_compute_similarity_transform_torch(S1, S2):
@@ -67,6 +70,7 @@ def batch_compute_similarity_transform_torch(S1, S2):
     return S1_hat
 
 
+'''
 def get_max_preds(batch_heatmap):
     batch_size = batch_heatmap.shape[0]
     num_joints = batch_heatmap.shape[1]
@@ -86,24 +90,7 @@ def get_max_preds(batch_heatmap):
 
     preds *= pred_mask
     return preds, maxvals
-
-
-def get_3d_joints(batch_heatmap, batch_depthmap):
-    for h, d in zip(batch_heatmap.shape, batch_depthmap.shape):
-        assert h is d, 'Heatmap and Depthmap have different shapes.'
-
-    max_vals, row_idx = batch_heatmap.max(2)
-    max_vals, col_idx = max_vals.max(2)
-
-    depth = torch.take(batch_depthmap, row_idx)
-    depth = torch.take(depth, col_idx)
-
-    row_idx = row_idx.take(col_idx).type(torch.float32)
-    col_idx = col_idx.float()
-    points_3d = torch.cat((row_idx.unsqueeze(2), col_idx.unsqueeze(2), depth.unsqueeze(2)), 2)
-    max_vals[max_vals < 0] = 0.0
-    return points_3d, max_vals.unsqueeze(2)
-
+'''
 
 class JointsMSELoss(nn.Module):
     def __init__(self, use_target_weight):
@@ -241,7 +228,24 @@ class WeaklySupervisedLoss(nn.Module):
         self.mse = nn.MSELoss(reduction='mean')
         self.use_target_weight = use_target_weight
         self.alpha = 0.1
-        self.beta = 0.01
+        self.beta = 1
+        self.SoftArgmax2D = SoftArgmax2D(window_fn='Parzen')
+        self.SoftArgmax1D = SoftArgmax1D()
+
+    def get_3d_joints(self, batch_heatmap, batch_depthmap):
+        for h, d in zip(batch_heatmap.shape, batch_depthmap.shape):
+            assert h is d, 'Heatmap and Depthmap have different shapes.'
+
+        heatmap_index = self.SoftArgmax2D(batch_heatmap)
+        batch_size = batch_heatmap.shape[0]
+        joint_size = batch_heatmap.shape[1]
+
+        depth_index = self.SoftArgmax1D(batch_heatmap.view(batch_size, joint_size, -1))
+        depthmap = batch_depthmap.view(batch_size, joint_size, -1)
+        depth = torch.gather(depthmap, 2, depth_index)
+
+        return torch.cat([torch.unsqueeze(heatmap_index, 2), torch.unsqueeze(depth, 2)], dim=2)
+
 
     def forward(self, hm_outputs, dm_outputs, targets, target_weights, limb):
         limb_length_loss = 0.0
@@ -249,12 +253,19 @@ class WeaklySupervisedLoss(nn.Module):
         joint_mse_loss = 0.0
         joints_3ds, pred_weights = [], []
         for heatmap, depthmap, target, target_weight in zip(hm_outputs, dm_outputs, targets, target_weights):
-            joints_3d, pred_weight = get_3d_joints(heatmap, depthmap)
+            joints_3d, pred_weight = self.get_3d_joints(heatmap, depthmap)
             joint_mse_loss += self.criterion1(heatmap, target, target_weight)
+
+            human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
+                                 (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
+            if self.beta is 100:
+                vis_3d_multiple_skeleton(joints_3d.cpu().detach().numpy(), target_weight.cpu().detach().numpy(), human36_edge)
+            self.beta += 1
+
             #limb_length_loss += self.criterion2(joints_3d, limb, pred_weight, target_weight)
             joints_3ds.append(joints_3d)
         multiview_consistency_loss += self.criterion3(joints_3ds)
-        return joint_mse_loss + self.alpha * multiview_consistency_loss #+ self.beta * limb_length_loss
+        return joint_mse_loss #+ self.alpha * multiview_consistency_loss #+ self.beta * limb_length_loss
 
 
 class JointMPJPELoss(nn.Module):
