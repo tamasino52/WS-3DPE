@@ -106,6 +106,8 @@ def main():
     pose_hrnet = get_pose_net(config, is_pretrain=False)
     pose_hrnet.init_weights(config['NETWORK']['PRETRAINED'])
     depth_hrnet = get_pose_net(config, is_pretrain=False)
+    depth_hrnet.init_weights(config['NETWORK']['PRETRAINED'])
+
     mv_hrnet = HRNetEnsemble(pose_hrnet, depth_hrnet)
 
     # Multi GPUs Setting

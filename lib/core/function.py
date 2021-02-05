@@ -68,6 +68,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch, output_dir, 
             acc.update(avg_acc, cnt)
             prefix = '{}_{}'.format(os.path.join(output_dir, 'train'), i)
             save_debug_images(config, input, meta, target, pred * 4, output_heatmap, output_depthmap, prefix)
+
             msg = 'Epoch: [{0}][{1}/{2}]\t' \
                   'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t' \
                   'Speed {speed:.1f} samples/s\t' \

@@ -117,6 +117,62 @@ def save_batch_heatmaps(batch_image, batch_heatmaps, file_name,
     cv2.imwrite(file_name, grid_image)
 
 
+def save_batch_depthmaps(batch_image, batch_heatmaps, file_name,
+                        normalize=True):
+    '''
+    batch_image: [batch_size, channel, height, width]
+    batch_heatmaps: ['batch_size, num_joints, height, width]
+    file_name: saved file name
+    '''
+    if normalize:
+        batch_image = batch_image.clone()
+        min = float(batch_image.min())
+        max = float(batch_image.max())
+
+        batch_image.add_(-min).div_(max - min + 1e-5)
+
+    batch_size = batch_heatmaps.size(0)
+    num_joints = batch_heatmaps.size(1)
+    heatmap_height = batch_heatmaps.size(2)
+    heatmap_width = batch_heatmaps.size(3)
+
+    grid_image = np.zeros((batch_size*heatmap_height,
+                           (num_joints+1)*heatmap_width,
+                           3),
+                          dtype=np.uint8)
+
+    for i in range(batch_size):
+        image = batch_image[i].mul(255)\
+                              .clamp(0, 255)\
+                              .byte()\
+                              .permute(1, 2, 0)\
+                              .cpu().numpy()
+        heatmaps = batch_heatmaps[i].mul(255)\
+                                    .clamp(0, 255)\
+                                    .byte()\
+                                    .cpu().numpy()
+
+        resized_image = cv2.resize(image,
+                                   (int(heatmap_width), int(heatmap_height)))
+
+        height_begin = heatmap_height * i
+        height_end = heatmap_height * (i + 1)
+        for j in range(num_joints):
+            heatmap = heatmaps[j, :, :]
+            colored_heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+            masked_image = colored_heatmap*0.7 + resized_image*0.3
+            width_begin = heatmap_width * (j+1)
+            width_end = heatmap_width * (j+2)
+            grid_image[height_begin:height_end, width_begin:width_end, :] = \
+                masked_image
+            # grid_image[height_begin:height_end, width_begin:width_end, :] = \
+            #     colored_heatmap*0.7 + resized_image*0.3
+
+        grid_image[height_begin:height_end, 0:heatmap_width, :] = resized_image
+
+    cv2.imwrite(file_name, grid_image)
+
+
 def save_debug_images(config, input, meta, target, joints_pred, output, depth, prefix):
     if not config.DEBUG.DEBUG:
         return
@@ -140,13 +196,9 @@ def save_debug_images(config, input, meta, target, joints_pred, output, depth, p
             input, output, '{}_hm_pred.jpg'.format(prefix)
         )
     if config.DEBUG.SAVE_HEATMAPS_PRED:
-        save_batch_heatmaps(
+        save_batch_depthmaps(
             input, depth, '{}_dm_pred.jpg'.format(prefix)
         )
-
-
-
-
 
 
 def vis_keypoints(img, kps, kps_lines, kp_thresh=0.4, alpha=1):
