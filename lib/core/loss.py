@@ -185,22 +185,16 @@ class LimbLengthLoss(nn.Module):
         child = torch.index_select(output_weight, 1, torch.cuda.LongTensor([item[1] for item in self.human36_edge]))
         return parent.mul(child)
 
-    def forward(self, output, target, target_weight):
+    def forward(self, joints_3ds):
         loss = 0
-        target = target.unsqueeze(2)
-        length_weight = self.get_limb_length(target_weight)
+        root_joints_3d = joints_3ds[0]
+        root_length_pred = self.get_limb_length(root_joints_3d)
+        root_length_pred_hat = root_length_pred / root_length_pred.mean()
 
-        length_target = self.get_limb_length(target)
-        length_pred = self.get_limb_length(output)
-
-        length_target = length_target[length_weight > 0]
-        length_pred = length_pred[length_weight > 0]
-
-        length_target = self.batch_norm(length_target)
-        length_pred = self.batch_norm(length_pred)
-
-        loss += self.criterion(length_pred, length_target)
-
+        for joints_3d in joints_3ds[1:]:
+            length_pred = self.get_limb_length(joints_3d)
+            length_pred_hat = length_pred / length_pred.mean()
+            loss += self.criterion(root_length_pred_hat, length_pred_hat)
         return loss
 
 
@@ -211,11 +205,18 @@ class MultiViewConsistencyLoss(nn.Module):
         self.human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
                              (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
 
-    def forward(self, joints_3ds):
+    def forward(self, joints_3ds, target_weight):
         root_joints_3d = joints_3ds[0]
-        loss = 0
+        b = root_joints_3d.shape[0]
+        root_joints_3d = root_joints_3d.view(-1, 3)
+        target_weight = target_weight.view(-1)
+        root_joints_3d = root_joints_3d[target_weight > 0, :].view(b, -1, 3)
+
+        loss = 0.0
         cnt = 0
         for joints_3d in joints_3ds[1:]:
+            joints_3d = joints_3d.view(-1, 3)
+            joints_3d = joints_3d[target_weight > 0, :].view(b, -1, 3)
             joints_3d_hat = batch_compute_similarity_transform_torch(joints_3d, root_joints_3d)
             loss += self.criterion(joints_3d_hat, root_joints_3d)
             cnt += 1
@@ -230,8 +231,8 @@ class WeaklySupervisedLoss(nn.Module):
         self.criterion3 = MultiViewConsistencyLoss()
         self.mse = nn.MSELoss(reduction='mean')
         self.use_target_weight = use_target_weight
-        self.alpha = 0.01
-        self.beta = 0.01
+        self.alpha = 0.05
+        self.beta = 0.05
         self.SoftArgmax2D = SoftArgmax2D(window_fn='Parzen')
 
     def get_3d_joints(self, batch_heatmap, batch_depthmap):
@@ -252,9 +253,9 @@ class WeaklySupervisedLoss(nn.Module):
         for heatmap, depthmap, target, target_weight in zip(hm_outputs, dm_outputs, targets, target_weights):
             joints_3d = self.get_3d_joints(heatmap, depthmap)
             joint_mse_loss += self.criterion1(heatmap, target, target_weight)
-            limb_length_loss += self.criterion2(joints_3d, limb, target_weight)
             joints_3ds.append(joints_3d)
-        multiview_consistency_loss += self.criterion3(joints_3ds)
+        limb_length_loss += self.criterion2(joints_3ds)
+        multiview_consistency_loss += self.criterion3(joints_3ds, target_weights[0])
         return joint_mse_loss + self.alpha * multiview_consistency_loss + self.beta * limb_length_loss
 
 
