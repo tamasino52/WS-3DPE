@@ -109,48 +109,56 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_l
     idx = 0
     with torch.no_grad():
         end = time.time()
-        for i, (input, target, target_weight, meta) in enumerate(val_loader):
+        for i, data in enumerate(val_loader):
+            inputs, targets, target_weights, metas, limb = data
+
+            # load on cuda
+            targets = [target.cuda(non_blocking=True) for target in targets]
+            target_weights = [target_weight.cuda(non_blocking=True) for target_weight in target_weights]
+            limb = limb.cuda(non_blocking=True)
+
+            output_heatmaps = []
+            output_depthmaps = []
+
             # compute output
-            outputs = model(input)
-            if isinstance(outputs, list):
-                output = outputs[-1]
-            else:
-                output = outputs
+            for v, (input, target, target_weight, meta) in enumerate(zip(inputs, targets, target_weights, metas)):
+                output_heatmap, output_depthmap = model(input)
+                output_heatmaps.append(output_heatmap)
+                output_depthmaps.append(output_depthmap)
 
-            target = target.cuda(non_blocking=True)
-            target_weight = target_weight.cuda(non_blocking=True)
+            loss = criterion(output_heatmaps, output_depthmaps, targets, target_weights, limb)
 
-            loss = criterion(output, target, target_weight)
-
-            num_images = input.size(0)
+            num_images = inputs[0].size(0)
             # measure accuracy and record loss
-            losses.update(loss.item(), num_images)
-            _, avg_acc, cnt, pred = accuracy(output.cpu().numpy(),
-                                             target.cpu().numpy())
+            losses.update(loss.item(), num_images * (v+1))
 
-            acc.update(avg_acc, cnt)
+            for output_heatmap, output_depthmap, target, meta in zip(output_heatmaps, output_depthmaps, targets, metas):
 
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
+                _, avg_acc, cnt, pred = accuracy(output_heatmap.cpu().numpy(),
+                                                 target.cpu().numpy())
 
-            c = meta['center'].numpy()
-            s = meta['scale'].numpy()
-            score = meta['score'].numpy()
+                acc.update(avg_acc, cnt)
 
-            preds, maxvals = get_final_preds(
-                config, output.clone().cpu().numpy(), c, s)
+                # measure elapsed time
+                batch_time.update(time.time() - end)
+                end = time.time()
 
-            all_preds[idx:idx + num_images, :, 0:2] = preds[:, :, 0:2]
-            all_preds[idx:idx + num_images, :, 2:3] = maxvals
-            # double check this all_boxes parts
-            all_boxes[idx:idx + num_images, 0:2] = c[:, 0:2]
-            all_boxes[idx:idx + num_images, 2:4] = s[:, 0:2]
-            all_boxes[idx:idx + num_images, 4] = np.prod(s*200, 1)
-            all_boxes[idx:idx + num_images, 5] = score
-            image_path.extend(meta['image'])
+                c = meta['center'].numpy()
+                s = meta['scale'].numpy()
+                score = meta['score'].numpy()
 
-            idx += num_images
+                preds, maxvals = get_final_preds(
+                    config, output_heatmap.clone().cpu().numpy(), c, s)
+                all_preds[idx:idx + num_images, :, 0:2] = preds[:, :, 0:2]
+                all_preds[idx:idx + num_images, :, 2:3] = maxvals
+                # double check this all_boxes parts
+                all_boxes[idx:idx + num_images, 0:2] = c[:, 0:2]
+                all_boxes[idx:idx + num_images, 2:4] = s[:, 0:2]
+                all_boxes[idx:idx + num_images, 4] = np.prod(s*200, 1)
+                all_boxes[idx:idx + num_images, 5] = score
+                image_path.extend(meta['image'])
+
+                idx += num_images
 
             if i % config.PRINT_FREQ == 0:
                 msg = 'Test: [{0}/{1}]\t' \
@@ -164,8 +172,8 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_l
                 prefix = '{}_{}'.format(
                     os.path.join(output_dir, 'val'), i
                 )
-                save_debug_images(config, input, meta, target, pred*4, output,
-                                  prefix)
+                save_debug_images(config, input, meta, target, pred*4, output_heatmap, output_depthmap, prefix)
+
 
         name_values, perf_indicator = val_dataset.evaluate(
             config, all_preds, output_dir, all_boxes, image_path,

@@ -16,60 +16,9 @@ from torch_batch_svd import svd
 from lib.utils.vis import vis_3d_multiple_skeleton, vis_3d_skeleton
 from lib.core.inference import get_max_preds
 from lib.utils.soft_argmax import SoftArgmax1D, SoftArgmax2D
+from lib.utils.procrustes import batch_compute_similarity_transform_torch, compute_similarity_transform_torch
 
 
-def batch_compute_similarity_transform_torch(S1, S2):
-    '''
-    Computes a similarity transform (sR, t) that takes
-    a set of 3D points S1 (3 x N) closest to a set of 3D points S2,
-    where R is an 3x3 rotation matrix, t 3x1 translation, s scale.
-    i.e. solves the orthogonal Procrutes problem.
-    '''
-    transposed = False
-    if S1.shape[0] != 3 and S1.shape[0] != 2:
-        S1 = S1.permute(0,2,1)
-        S2 = S2.permute(0,2,1)
-        transposed = True
-    assert(S2.shape[1] == S1.shape[1])
-
-    # 1. Remove mean.
-    mu1 = S1.mean(axis=-1, keepdims=True)
-    mu2 = S2.mean(axis=-1, keepdims=True)
-
-    X1 = S1 - mu1
-    X2 = S2 - mu2
-
-    # 2. Compute variance of X1 used for scale.
-    var1 = torch.sum(X1**2, dim=1).sum(dim=1)
-
-    # 3. The outer product of X1 and X2.
-    K = X1.bmm(X2.permute(0,2,1))
-
-    # 4. Solution that Maximizes trace(R'K) is R=U*V', where U, V are
-    # singular vectors of K.
-    U, s, V = svd(K)
-
-    # Construct Z that fixes the orientation of R to get det(R)=1.
-    Z = torch.eye(U.shape[1], device=S1.device).unsqueeze(0)
-    Z = Z.repeat(U.shape[0],1,1)
-    Z[:,-1, -1] *= torch.sign(torch.det(U.bmm(V.permute(0,2,1))))
-
-    # Construct R.
-    R = V.bmm(Z.bmm(U.permute(0,2,1)))
-
-    # 5. Recover scale.
-    scale = torch.cat([torch.trace(x).unsqueeze(0) for x in R.bmm(K)]) / var1
-
-    # 6. Recover translation.
-    t = mu2 - (scale.unsqueeze(-1).unsqueeze(-1) * (R.bmm(mu1)))
-
-    # 7. Error:
-    S1_hat = scale.unsqueeze(-1).unsqueeze(-1) * R.bmm(S1) + t
-
-    if transposed:
-        S1_hat = S1_hat.permute(0,2,1)
-
-    return S1_hat
 
 
 '''
@@ -93,6 +42,7 @@ def get_max_preds(batch_heatmap):
     preds *= pred_mask
     return preds, maxvals
 '''
+
 
 class JointsMSELoss(nn.Module):
     def __init__(self, use_target_weight):
@@ -205,22 +155,29 @@ class MultiViewConsistencyLoss(nn.Module):
         self.human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
                              (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
 
-    def forward(self, joints_3ds, target_weight):
-        root_joints_3d = joints_3ds[0]
-        b = root_joints_3d.shape[0]
-        root_joints_3d = root_joints_3d.view(-1, 3)
-        target_weight = target_weight.view(-1)
-        root_joints_3d = root_joints_3d[target_weight > 0, :].view(b, -1, 3)
+    def forward(self, joints_3ds, target_weights):
+        batch_root_joints_3d = joints_3ds[0]
+        batch_size = batch_root_joints_3d.shape[0]
+        batch_root_target_weight = target_weights[0]
 
         loss = 0.0
-        cnt = 0
-        for joints_3d in joints_3ds[1:]:
-            joints_3d = joints_3d.view(-1, 3)
-            joints_3d = joints_3d[target_weight > 0, :].view(b, -1, 3)
-            joints_3d_hat = batch_compute_similarity_transform_torch(joints_3d, root_joints_3d)
-            loss += self.criterion(joints_3d_hat, root_joints_3d)
-            cnt += 1
-        return loss / cnt
+        count = 0.0
+        for batch_joints_3d, batch_target_weight in zip(joints_3ds[1:], target_weights[1:]):
+            for b in range(batch_size):
+                root_joints_3d = batch_root_joints_3d[b]
+                joints_3d = batch_joints_3d[b]
+                root_target_weight = batch_root_target_weight[b]
+                target_weight = batch_target_weight[b]
+
+                target_weight = (target_weight * root_target_weight).view(-1)
+
+                root_joints_3d = root_joints_3d[target_weight > 0, :]
+                joints_3d = joints_3d[target_weight > 0, :]
+
+                joints_3d_hat = compute_similarity_transform_torch(joints_3d, root_joints_3d)
+                loss += self.criterion(joints_3d_hat, root_joints_3d)
+                count += 1.0
+        return loss / count
 
 
 class WeaklySupervisedLoss(nn.Module):
@@ -231,8 +188,8 @@ class WeaklySupervisedLoss(nn.Module):
         self.criterion3 = MultiViewConsistencyLoss()
         self.mse = nn.MSELoss(reduction='mean')
         self.use_target_weight = use_target_weight
-        self.alpha = 0.05
-        self.beta = 0.05
+        self.alpha = 0.0
+        self.beta = 0.0
         self.SoftArgmax2D = SoftArgmax2D(window_fn='Parzen')
 
     def get_3d_joints(self, batch_heatmap, batch_depthmap):
@@ -255,7 +212,7 @@ class WeaklySupervisedLoss(nn.Module):
             joint_mse_loss += self.criterion1(heatmap, target, target_weight)
             joints_3ds.append(joints_3d)
         limb_length_loss += self.criterion2(joints_3ds)
-        multiview_consistency_loss += self.criterion3(joints_3ds, target_weights[0])
+        multiview_consistency_loss += self.criterion3(joints_3ds, target_weights)
         return joint_mse_loss + self.alpha * multiview_consistency_loss + self.beta * limb_length_loss
 
 

@@ -173,7 +173,7 @@ def save_batch_depthmaps(batch_image, batch_heatmaps, file_name,
     cv2.imwrite(file_name, grid_image)
 
 
-def save_debug_images(config, input, meta, target, joints_pred, output, depth, prefix):
+def save_debug_images(config, input, meta, target, joints_pred, output, depth=None, prefix=None):
     if not config.DEBUG.DEBUG:
         return
 
@@ -195,7 +195,7 @@ def save_debug_images(config, input, meta, target, joints_pred, output, depth, p
         save_batch_heatmaps(
             input, output, '{}_hm_pred.jpg'.format(prefix)
         )
-    if config.DEBUG.SAVE_HEATMAPS_PRED:
+    if config.DEBUG.SAVE_HEATMAPS_PRED and depth is not None:
         save_batch_depthmaps(
             input, depth, '{}_dm_pred.jpg'.format(prefix)
         )

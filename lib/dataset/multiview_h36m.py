@@ -116,7 +116,7 @@ class MultiViewH36M(JointsDataset):
             datum['subject'], datum['action'], datum['subaction'],
             datum['image_id'])
 
-    def evaluate(self, pred, *args, **kwargs):
+    def evaluate(self, config, pred, *args, **kwargs):
         pred = pred.copy()
 
         headsize = self.image_size[0] / 10.0
