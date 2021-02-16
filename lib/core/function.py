@@ -88,6 +88,8 @@ def train(config, train_loader, model, criterion, optimizer, epoch, output_dir, 
             writer.add_scalar('train_loss', losses.val, global_steps)
             writer.add_scalar('train_acc', acc.val, global_steps)
             writer_dict['train_global_steps'] = global_steps + 1
+        if i == 20:
+            break
 
 
 def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_log_dir, writer_dict=None):
@@ -99,11 +101,13 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_l
     model.eval()
 
     num_samples = len(val_dataset)
-    all_preds = np.zeros(
-        (num_samples, config.NETWORK.NUM_JOINTS, 3),
-        dtype=np.float32
-    )
-    all_boxes = np.zeros((num_samples, 6))
+    all_preds = np.empty((0, config.NETWORK.NUM_JOINTS, 3), dtype=np.float)
+    all_boxes = np.empty((0, 6), dtype=np.float)
+    #all_preds = np.zeros(
+    #    (num_samples, config.NETWORK.NUM_JOINTS, 3),
+    #    dtype=np.float32
+    #)
+    #all_boxes = np.zeros((num_samples, 6))
     image_path = []
     filenames = []
     idx = 0
@@ -149,6 +153,15 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_l
 
                 preds, maxvals = get_final_preds(
                     config, output_heatmap.clone().cpu().numpy(), c, s)
+                all_preds = np.append(all_preds, np.concatenate((preds, maxvals), axis=2), axis=0)
+                all_boxes = np.append(all_boxes, np.concatenate((
+                    c[:, 0:2],
+                    s[:, 0:2],
+                    np.expand_dims(np.prod(s*200, 1), axis=1),
+                    np.expand_dims(score, axis=1)
+                ), axis=1), axis=0)
+
+                '''
                 all_preds[idx:idx + num_images, :, 0:2] = preds[:, :, 0:2]
                 all_preds[idx:idx + num_images, :, 2:3] = maxvals
                 # double check this all_boxes parts
@@ -156,10 +169,14 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_l
                 all_boxes[idx:idx + num_images, 2:4] = s[:, 0:2]
                 all_boxes[idx:idx + num_images, 4] = np.prod(s*200, 1)
                 all_boxes[idx:idx + num_images, 5] = score
+                '''
+
                 image_path.extend(meta['image'])
 
-                idx += num_images
+                #idx += num_images
 
+            if i is 20:
+                break
             if i % config.PRINT_FREQ == 0:
                 msg = 'Test: [{0}/{1}]\t' \
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t' \
@@ -174,7 +191,8 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_l
                 )
                 save_debug_images(config, input, meta, target, pred*4, output_heatmap, output_depthmap, prefix)
 
-
+        all_preds = np.array(all_preds)
+        all_boxes = np.array(all_boxes)
         name_values, perf_indicator = val_dataset.evaluate(
             config, all_preds, output_dir, all_boxes, image_path,
             filenames

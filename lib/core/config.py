@@ -23,7 +23,7 @@ config.BACKBONE_MODEL = 'pose_hrnet'
 config.MODEL = 'multiview_pose_hrnet'
 config.GPUS = '0,1'
 config.WORKERS = 24
-config.PRINT_FREQ = 10
+config.PRINT_FREQ = 100
 
 # hrnet definition
 config.MODEL_EXTRA = edict()
@@ -103,8 +103,8 @@ config.DATASET.CROP = True
 config.DATASET.FLIP = True
 
 # training data augmentation
-config.DATASET.SCALE_FACTOR = 0
-config.DATASET.ROT_FACTOR = 0
+config.DATASET.SCALE_FACTOR = 0.2
+config.DATASET.ROT_FACTOR = 0.2
 
 # train
 config.TRAIN = edict()
@@ -239,8 +239,8 @@ def update_dir(model_dir, log_dir, data_dir):
 
 
 def get_model_name(cfg):
-    name = '{model}_{num_layers}'.format(
-        model=cfg.MODEL, num_layers=cfg.POSE_RESNET.NUM_LAYERS)
+    name = '{model}'.format(
+        model=cfg.MODEL)
     deconv_suffix = ''.join(
         'd{}'.format(num_filters)
         for num_filters in cfg.POSE_RESNET.NUM_DECONV_FILTERS)
