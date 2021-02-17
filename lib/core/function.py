@@ -18,7 +18,7 @@ import torch
 from core.evaluate import accuracy
 from core.inference import get_final_preds
 
-from utils.vis import save_debug_images
+from utils.vis import save_debug_images, save_batch_skeleton
 
 
 logger = logging.getLogger(__name__)
@@ -68,7 +68,9 @@ def train(config, train_loader, model, criterion, optimizer, epoch, output_dir, 
             acc.update(avg_acc, cnt)
             prefix = '{}_{}'.format(os.path.join(output_dir, 'train'), i)
             save_debug_images(config, input, meta, target, pred * 4, output_heatmap, output_depthmap, prefix)
-
+            human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
+                            (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
+            save_batch_skeleton(inputs, output_heatmaps, output_depthmaps, meta['joints_vis'], human36_edge, '{}_3d.jpg'.format(prefix))
             msg = 'Epoch: [{0}][{1}/{2}]\t' \
                   'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t' \
                   'Speed {speed:.1f} samples/s\t' \
@@ -88,8 +90,6 @@ def train(config, train_loader, model, criterion, optimizer, epoch, output_dir, 
             writer.add_scalar('train_loss', losses.val, global_steps)
             writer.add_scalar('train_acc', acc.val, global_steps)
             writer_dict['train_global_steps'] = global_steps + 1
-        if i == 20:
-            break
 
 
 def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_log_dir, writer_dict=None):
@@ -100,17 +100,21 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_l
     # switch to evaluate mode
     model.eval()
 
-    num_samples = len(val_dataset)
+    #num_samples = len(val_dataset)
     all_preds = np.empty((0, config.NETWORK.NUM_JOINTS, 3), dtype=np.float)
     all_boxes = np.empty((0, 6), dtype=np.float)
-    #all_preds = np.zeros(
-    #    (num_samples, config.NETWORK.NUM_JOINTS, 3),
-    #    dtype=np.float32
-    #)
-    #all_boxes = np.zeros((num_samples, 6))
+
+    '''
+    all_preds = np.zeros(
+        (num_samples, config.NETWORK.NUM_JOINTS, 3),
+        dtype=np.float32
+    )
+    all_boxes = np.zeros((num_samples, 6))
+    '''
+
     image_path = []
     filenames = []
-    idx = 0
+
     with torch.no_grad():
         end = time.time()
         for i, data in enumerate(val_loader):
@@ -175,8 +179,6 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_l
 
                 #idx += num_images
 
-            if i is 20:
-                break
             if i % config.PRINT_FREQ == 0:
                 msg = 'Test: [{0}/{1}]\t' \
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t' \
@@ -240,20 +242,28 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_l
 def _print_name_value(name_value, full_arch_name):
     names = name_value.keys()
     values = name_value.values()
+    '''
     num_values = len(name_value)
     logger.info(
-        '| Arch ' +
+        '| Architecture ' +
         ' '.join(['| {}'.format(name) for name in names]) +
         ' |'
     )
     logger.info('|---' * (num_values+1) + '|')
 
     if len(full_arch_name) > 15:
-        full_arch_name = full_arch_name[:8] + '...'
+        full_arch_name = full_arch_name[:]
     logger.info(
         '| ' + full_arch_name + ' ' +
         ' '.join(['| {:.3f}'.format(value) for value in values]) +
          ' |'
+    )
+    '''
+
+    logger.info(
+        '| ' + full_arch_name + ' ' +
+        ' '.join(['| {} {:.3f}'.format(name, value) for name, value in zip(names, values)]) +
+        ' |'
     )
 
 

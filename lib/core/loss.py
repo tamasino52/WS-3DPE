@@ -188,8 +188,8 @@ class WeaklySupervisedLoss(nn.Module):
         self.criterion3 = MultiViewConsistencyLoss()
         self.mse = nn.MSELoss(reduction='mean')
         self.use_target_weight = use_target_weight
-        self.alpha = 0.0
-        self.beta = 0.0
+        self.alpha = 0.001
+        self.beta = 0.001
         self.SoftArgmax2D = SoftArgmax2D(window_fn='Parzen')
 
     def get_3d_joints(self, batch_heatmap, batch_depthmap):
@@ -199,6 +199,7 @@ class WeaklySupervisedLoss(nn.Module):
         batch_soft_heatmap = torch.nn.functional.softmax(batch_heatmap.view(b, n, -1), dim=2).view(b, n, h, w)
         batch_soft_depthmap = batch_soft_heatmap.matmul(batch_depthmap)
         depth = batch_soft_depthmap.sum(dim=[2, 3]).unsqueeze(2)
+        depth = depth * h + h / 2
         heatmap_index = self.SoftArgmax2D(batch_heatmap)
         return torch.cat([heatmap_index, depth], dim=2)
 
