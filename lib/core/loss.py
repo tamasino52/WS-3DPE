@@ -199,7 +199,7 @@ class WeaklySupervisedLoss(nn.Module):
         batch_soft_heatmap = torch.nn.functional.softmax(batch_heatmap.view(b, n, -1), dim=2).view(b, n, h, w)
         batch_soft_depthmap = batch_soft_heatmap.matmul(batch_depthmap)
         depth = batch_soft_depthmap.sum(dim=[2, 3]).unsqueeze(2)
-        depth = depth * h + h / 2
+        depth = depth * h
         heatmap_index = self.SoftArgmax2D(batch_heatmap)
         return torch.cat([heatmap_index, depth], dim=2)
 

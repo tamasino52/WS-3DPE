@@ -4,11 +4,8 @@
     <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="Validation Part Modified">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/core/function.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/function.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/loss.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/loss.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/utils/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/utils/utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/utils/vis.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/utils/vis.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -301,7 +298,14 @@
       <option name="project" value="LOCAL" />
       <updated>1613480312270</updated>
     </task>
-    <option name="localTasksCounter" value="23" />
+    <task id="LOCAL-00023" summary="Validation Part Modified">
+      <created>1613574122553</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1613574122553</updated>
+    </task>
+    <option name="localTasksCounter" value="24" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">

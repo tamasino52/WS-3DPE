@@ -228,6 +228,7 @@ def save_batch_skeleton(batch_image_list, batch_heatmap_list, batch_depthmap_lis
             for l in range(len(kps_lines)):
                 i1 = kps_lines[l][0]
                 i2 = kps_lines[l][1]
+
                 x = np.array([kpt_3d[i1, 0], kpt_3d[i2, 0]])
                 y = np.array([kpt_3d[i1, 1], kpt_3d[i2, 1]])
                 z = np.array([kpt_3d[i1, 2], kpt_3d[i2, 2]])
@@ -242,8 +243,8 @@ def save_batch_skeleton(batch_image_list, batch_heatmap_list, batch_depthmap_lis
                 ax.set_ylabel('D')
                 ax.set_zlabel('Y')
                 ax.set_xlim(0, 64)
-                ax.set_ylim(0, 64)
-                ax.set_zlim(0, 64)
+                ax.set_ylim(-32, 32)
+                ax.set_zlim(-64, 0)
 
             idx += 2
     plt.savefig(file_name)
