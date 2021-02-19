@@ -35,7 +35,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch, output_dir, 
 
     end = time.time()
     for i, data in enumerate(train_loader):
-        inputs, targets, target_weights, metas, limb = data
+        inputs, targets, target_weights, cameras, metas, limb = data
         # measure data loading time
         data_time.update(time.time() - end)
 
@@ -43,6 +43,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch, output_dir, 
         targets = [target.cuda(non_blocking=True) for target in targets]
         target_weights = [target_weight.cuda(non_blocking=True) for target_weight in target_weights]
         limb = limb.cuda(non_blocking=True)
+        cameras = [camera.cuda(non_blocking=True) for camera in cameras]
 
         output_heatmaps = []
         output_depthmaps = []
@@ -52,7 +53,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch, output_dir, 
             output_heatmaps.append(output_heatmap)
             output_depthmaps.append(output_depthmap)
 
-        loss = criterion(output_heatmaps, output_depthmaps, targets, target_weights, limb)
+        loss = criterion(output_heatmaps, output_depthmaps, targets, target_weights, cameras, limb)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()

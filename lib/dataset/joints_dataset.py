@@ -123,6 +123,7 @@ class JointsDataset(Dataset):
         scale = np.array(db_rec['scale']).copy()
         rotation = 0
         score = db_rec['score'] if 'score' in db_rec else 1
+        camera = db_rec['camera']
 
         if self.is_train:
             sf = self.scale_factor
@@ -162,10 +163,18 @@ class JointsDataset(Dataset):
             'joints_2d_transformed': joints,
             'joints_vis': joints_vis,
             'source': db_rec['source'],
-            'score': score
+            'score': score,
+            'camera': camera
         }
 
-        return input, target, target_weight, meta
+        intrinsic_camera = np.zeros((3, 3), np.float32)
+        intrinsic_camera[0, 0] = camera['fx']
+        intrinsic_camera[1, 1] = camera['fy']
+        intrinsic_camera[0, 2] = camera['cx']
+        intrinsic_camera[1, 2] = camera['cy']
+        intrinsic_camera[2, 2] = 1
+
+        return input, target, target_weight, intrinsic_camera, meta
 
     def generate_target(self, joints_3d, joints_vis):
         target, weight = self.generate_heatmap(joints_3d, joints_vis)

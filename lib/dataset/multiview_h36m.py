@@ -98,15 +98,16 @@ class MultiViewH36M(JointsDataset):
         return filtered_grouping
 
     def __getitem__(self, idx):
-        input, target, weight, meta = [], [], [], []
+        input, target, weight, intrinsic_camera, meta = [], [], [], [], []
         items = self.grouping[idx]
         for item in items:
-            i, t, w, m = super().__getitem__(item)
+            i, t, w, c, m = super().__getitem__(item)
             input.append(i)
             target.append(t)
             weight.append(w)
+            intrinsic_camera.append(c)
             meta.append(m)
-        return input, target, weight, meta, self.limb
+        return input, target, weight, intrinsic_camera, meta, self.limb
 
     def __len__(self):
         return self.group_size

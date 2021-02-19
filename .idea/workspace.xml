@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="Validation Part Modified">
+    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="3D Skeleton Visualization Module added">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/function.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/function.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/loss.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/loss.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/dataset/joints_dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/dataset/joints_dataset.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/dataset/multiview_h36m.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/dataset/multiview_h36m.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/utils/procrustes.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/utils/procrustes.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/utils/vis.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/utils/vis.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -305,7 +308,14 @@
       <option name="project" value="LOCAL" />
       <updated>1613574122553</updated>
     </task>
-    <option name="localTasksCounter" value="24" />
+    <task id="LOCAL-00024" summary="3D Skeleton Visualization Module added">
+      <created>1613578566252</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1613578566252</updated>
+    </task>
+    <option name="localTasksCounter" value="25" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -331,7 +341,8 @@
     <MESSAGE value="Limb Length Loss added" />
     <MESSAGE value="수정" />
     <MESSAGE value="Validation Part Modified" />
-    <option name="LAST_COMMIT_MESSAGE" value="Validation Part Modified" />
+    <MESSAGE value="3D Skeleton Visualization Module added" />
+    <option name="LAST_COMMIT_MESSAGE" value="3D Skeleton Visualization Module added" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -363,13 +374,13 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/lib/dataset/multiview_h36m.py</url>
-          <line>138</line>
+          <line>139</line>
           <option name="timeStamp" value="338" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/lib/utils/vis.py</url>
-          <line>222</line>
-          <option name="timeStamp" value="347" />
+          <url>file://$PROJECT_DIR$/lib/utils/procrustes.py</url>
+          <line>201</line>
+          <option name="timeStamp" value="353" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>

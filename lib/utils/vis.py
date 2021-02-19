@@ -13,8 +13,9 @@ import math
 import numpy as np
 import torchvision
 import cv2
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 
 from core.inference import get_max_preds
 
@@ -196,7 +197,7 @@ def save_batch_skeleton(batch_image_list, batch_heatmap_list, batch_depthmap_lis
             kpt_3d_vis = batch_kpt_3d_vis[batch]
 
             preds, maxvals = get_max_preds(batch_heatmaps.detach().cpu().numpy())
-            batch_depths = (batch_depthmaps * batch_heatmaps).sum([2, 3]).unsqueeze(2).detach().cpu().numpy()
+            batch_depths = (batch_depthmaps * batch_heatmaps).sum([2, 3]).unsqueeze(2).detach().cpu().numpy() * 64
             batch_kpt_3d = np.concatenate((preds, batch_depths), axis=2)
 
             kpt_3d = batch_kpt_3d[batch]
@@ -242,9 +243,9 @@ def save_batch_skeleton(batch_image_list, batch_heatmap_list, batch_depthmap_lis
                 ax.set_xlabel('X')
                 ax.set_ylabel('D')
                 ax.set_zlabel('Y')
-                ax.set_xlim(0, 64)
-                ax.set_ylim(-32, 32)
-                ax.set_zlim(-64, 0)
+                #ax.set_xlim(0, 64)
+                #ax.set_ylim(-32, 32)
+                #ax.set_zlim(-64, 0)
 
             idx += 2
     plt.savefig(file_name)
