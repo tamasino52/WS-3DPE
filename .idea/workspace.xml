@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="3D Skeleton Visualization Module added">
+    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="3D Reconstruction Module added">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/function.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/function.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/inference.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/inference.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/loss.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/loss.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/dataset/joints_dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/dataset/joints_dataset.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/dataset/multiview_h36m.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/dataset/multiview_h36m.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/utils/procrustes.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/utils/procrustes.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/utils/vis.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/utils/vis.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -45,6 +43,7 @@
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="restartRequiresConfirmation" value="false" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
   <component name="RecentsManager">
@@ -315,7 +314,14 @@
       <option name="project" value="LOCAL" />
       <updated>1613578566252</updated>
     </task>
-    <option name="localTasksCounter" value="25" />
+    <task id="LOCAL-00025" summary="3D Reconstruction Module added">
+      <created>1613721057009</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1613721057009</updated>
+    </task>
+    <option name="localTasksCounter" value="26" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -342,7 +348,8 @@
     <MESSAGE value="수정" />
     <MESSAGE value="Validation Part Modified" />
     <MESSAGE value="3D Skeleton Visualization Module added" />
-    <option name="LAST_COMMIT_MESSAGE" value="3D Skeleton Visualization Module added" />
+    <MESSAGE value="3D Reconstruction Module added" />
+    <option name="LAST_COMMIT_MESSAGE" value="3D Reconstruction Module added" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -381,6 +388,16 @@
           <url>file://$PROJECT_DIR$/lib/utils/procrustes.py</url>
           <line>201</line>
           <option name="timeStamp" value="353" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/lib/core/loss.py</url>
+          <line>148</line>
+          <option name="timeStamp" value="356" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/lib/core/inference.py</url>
+          <line>92</line>
+          <option name="timeStamp" value="357" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>

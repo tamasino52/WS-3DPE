@@ -119,12 +119,13 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_l
     with torch.no_grad():
         end = time.time()
         for i, data in enumerate(val_loader):
-            inputs, targets, target_weights, metas, limb = data
+            inputs, targets, target_weights, cameras, metas, limb = data
 
             # load on cuda
             targets = [target.cuda(non_blocking=True) for target in targets]
             target_weights = [target_weight.cuda(non_blocking=True) for target_weight in target_weights]
             limb = limb.cuda(non_blocking=True)
+            cameras = [camera.cuda(non_blocking=True) for camera in cameras]
 
             output_heatmaps = []
             output_depthmaps = []
@@ -135,7 +136,7 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_l
                 output_heatmaps.append(output_heatmap)
                 output_depthmaps.append(output_depthmap)
 
-            loss = criterion(output_heatmaps, output_depthmaps, targets, target_weights, limb)
+            loss = criterion(output_heatmaps, output_depthmaps, targets, target_weights, cameras, limb)
 
             num_images = inputs[0].size(0)
             # measure accuracy and record loss
