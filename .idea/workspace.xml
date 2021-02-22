@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="3D Reconstruction Module added">
+    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="loss tuning">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/function.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/function.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/inference.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/inference.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/loss.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/loss.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/utils/vis.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/utils/vis.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -321,7 +322,14 @@
       <option name="project" value="LOCAL" />
       <updated>1613721057009</updated>
     </task>
-    <option name="localTasksCounter" value="26" />
+    <task id="LOCAL-00026" summary="loss tuning">
+      <created>1613805928711</created>
+      <option name="number" value="00026" />
+      <option name="presentableId" value="LOCAL-00026" />
+      <option name="project" value="LOCAL" />
+      <updated>1613805928711</updated>
+    </task>
+    <option name="localTasksCounter" value="27" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -349,7 +357,8 @@
     <MESSAGE value="Validation Part Modified" />
     <MESSAGE value="3D Skeleton Visualization Module added" />
     <MESSAGE value="3D Reconstruction Module added" />
-    <option name="LAST_COMMIT_MESSAGE" value="3D Reconstruction Module added" />
+    <MESSAGE value="loss tuning" />
+    <option name="LAST_COMMIT_MESSAGE" value="loss tuning" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -387,17 +396,17 @@
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/lib/utils/procrustes.py</url>
           <line>201</line>
-          <option name="timeStamp" value="353" />
+          <option name="timeStamp" value="360" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/lib/core/loss.py</url>
-          <line>148</line>
-          <option name="timeStamp" value="356" />
+          <url>file://$PROJECT_DIR$/lib/utils/vis.py</url>
+          <line>206</line>
+          <option name="timeStamp" value="363" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/lib/core/inference.py</url>
-          <line>92</line>
-          <option name="timeStamp" value="357" />
+          <url>file://$PROJECT_DIR$/lib/utils/vis.py</url>
+          <line>208</line>
+          <option name="timeStamp" value="364" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>

@@ -20,6 +20,7 @@ from lib.core.inference import get_max_preds
 from lib.utils.soft_argmax import SoftArgmax1D, SoftArgmax2D
 from lib.utils.procrustes import criterion_procrustes, compute_similarity_transform_torch
 from lib.core.inference import reconstruct_3d_kps, get_scale_normalized_pose
+from lib.core.inference import PoseReconstructor
 
 
 
@@ -131,7 +132,7 @@ class LimbLengthLoss(nn.Module):
                         (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
         parent = kps_3d[:, [item[0] for item in human36_edge], :]
         child = kps_3d[:, [item[1] for item in human36_edge], :]
-        dist = torch.norm(parent - child, dim=2).unsqueeze(2)
+        dist = (((parent - child) ** 2).sum(2) ** 0.5)
         return dist
 
     '''
@@ -147,7 +148,8 @@ class LimbLengthLoss(nn.Module):
         length_gt_hat = length_gt.unsqueeze(2) / length_gt.mean()
 
         length_pred = self.get_limb_length(joints_3d)
-        loss += self.criterion(length_gt_hat, length_pred)
+        length_pred_hat = length_pred.unsqueeze(2) / length_pred.mean(1).view(-1, 1, 1)
+        loss += self.criterion(length_gt_hat, length_pred_hat)
         return loss
 
 
@@ -186,36 +188,27 @@ class WeaklySupervisedLoss(nn.Module):
         self.criterion3 = MultiViewConsistencyLoss()
         self.mse = nn.MSELoss(reduction='mean')
         self.use_target_weight = use_target_weight
-        self.alpha = 0.2
-        self.beta = 1.0
-        self.SoftArgmax2D = SoftArgmax2D(window_fn='Parzen')
-
-    def get_kps_25d(self, batch_heatmap, batch_depthmap):
-        for h, d in zip(batch_heatmap.shape, batch_depthmap.shape):
-            assert h is d, 'Heatmap and Depthmap have different shapes.'
-        b, n, h, w = batch_heatmap.shape
-        batch_soft_heatmap = torch.nn.functional.softmax(batch_heatmap.view(b, n, -1), dim=2).view(b, n, h, w)
-        batch_soft_depthmap = batch_soft_heatmap.matmul(batch_depthmap)
-        depth = batch_soft_depthmap.sum(dim=[2, 3]).unsqueeze(2)
-        heatmap_index = self.SoftArgmax2D(batch_heatmap)
-        return torch.cat([heatmap_index, depth], dim=2)
+        self.alpha = 1.0
+        self.beta = 10.0
+        self.pose_reconstructor = PoseReconstructor()
 
     def forward(self, hm_outputs, dm_outputs, targets, target_weights, cameras, limb):
         limb_length_loss = 0.0
         multiview_consistency_loss = 0.0
         joint_mse_loss = 0.0
-        kps_3d_hat_list, pred_weights = [], []
+
+        kps_3d_hat_list = []
+
         data = zip(hm_outputs, dm_outputs, targets, target_weights, cameras)
         for heatmap, depthmap, target, target_weight, camera in data:
-            kps_25d = self.get_kps_25d(heatmap, depthmap)
-            kps_25d_hat = get_scale_normalized_pose(kps_25d)
-            kps_3d_hat = reconstruct_3d_kps(kps_25d_hat, camera)
             joint_mse_loss += self.criterion1(heatmap, target, target_weight)
+            kps_3d_hat = self.pose_reconstructor.infer(heatmap, depthmap, camera)
             limb_length_loss += self.criterion2(kps_3d_hat, limb)
             kps_3d_hat_list.append(kps_3d_hat)
 
         multiview_consistency_loss += self.criterion3(kps_3d_hat_list, target_weights)
-        return joint_mse_loss + self.alpha * multiview_consistency_loss + self.beta * limb_length_loss
+        total_loss = joint_mse_loss + self.alpha * multiview_consistency_loss + self.beta * limb_length_loss
+        return total_loss, joint_mse_loss, multiview_consistency_loss, limb_length_loss
 
 
 class JointMPJPELoss(nn.Module):
@@ -232,7 +225,7 @@ class JointMPJPELoss(nn.Module):
         """
         if joints_vis_3d is None:
             joints_vis_3d = torch.ones_like(joint_3d)[:,:,0:1]
-        l2_distance = torch.sqrt(((joint_3d - gt)**2).sum(dim=2))
+        l2_distance = 1
         joints_vis_3d = joints_vis_3d.view(*l2_distance.shape)
         masked_l2_distance = l2_distance * joints_vis_3d
         n_valid_joints = torch.sum(joints_vis_3d, dim=1)

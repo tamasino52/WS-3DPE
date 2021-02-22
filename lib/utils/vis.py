@@ -9,7 +9,8 @@ from __future__ import division
 from __future__ import print_function
 
 import math
-
+import torch
+import torch.nn.functional as F
 import numpy as np
 import torchvision
 import cv2
@@ -18,6 +19,10 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 from core.inference import get_max_preds
+from core.inference import get_scaling_factor
+from core.inference import get_scale_normalized_pose
+from core.inference import get_z_root
+from core.inference import reconstruct_3d_kps
 
 
 def save_batch_image_with_joints(batch_image, batch_joints, batch_joints_vis,
@@ -175,7 +180,7 @@ def save_batch_depthmaps(batch_image, batch_heatmaps, file_name,
     cv2.imwrite(file_name, grid_image)
 
 
-def save_batch_skeleton(batch_image_list, batch_heatmap_list, batch_depthmap_list, batch_kpt_3d_vis, kps_lines, file_name):
+def save_batch_skeleton(batch_image_list, batch_heatmap_list, batch_depthmap_list, batch_meta_list, kps_lines, file_name):
     '''
     batch_image: [batch_size, channel, height, width]
     batch_heatmap_list: [['batch_size, num_joints, height, width] ...]
@@ -187,17 +192,29 @@ def save_batch_skeleton(batch_image_list, batch_heatmap_list, batch_depthmap_lis
     view_size = len(batch_heatmap_list)
     batch_size = batch_heatmap_list[0].size(0)
 
-    fig = plt.figure(figsize=(8 * view_size, 4 * batch_size))
+    fig = plt.figure(figsize=(12 * view_size, 6 * batch_size))
     idx = 1
     for batch in range(batch_size):
         for view in range(view_size):
             batch_heatmaps = batch_heatmap_list[view]
             batch_depthmaps = batch_depthmap_list[view]
             batch_images = batch_image_list[view]
+            batch_kpt_3d_vis = batch_meta_list[view]['joints_vis']
             kpt_3d_vis = batch_kpt_3d_vis[batch]
 
+            b, n, h, w = batch_heatmaps.shape
+
             preds, maxvals = get_max_preds(batch_heatmaps.detach().cpu().numpy())
-            batch_depths = (batch_depthmaps * batch_heatmaps).sum([2, 3]).unsqueeze(2).detach().cpu().numpy() * 64
+
+            batch_soft_heatmap = F.softmax(batch_heatmaps.view(b, n, -1), dim=2).view(b, n, h, w)
+            batch_soft_depthmap = batch_soft_heatmap.matmul(batch_depthmaps)
+            depth = batch_soft_depthmap.sum(dim=[2, 3]).unsqueeze(2)
+            kps_25d = torch.cat([preds, depth], dim=2)
+
+            kps_25d_hat = get_scale_normalized_pose(kps_25d)
+            kps_3d_hat = reconstruct_3d_kps(kps_25d_hat, camera)
+
+            batch_depths = (batch_depthmaps * batch_heatmaps).sum([2, 3]).unsqueeze(2).detach().cpu().numpy()
             batch_kpt_3d = np.concatenate((preds, batch_depths), axis=2)
 
             kpt_3d = batch_kpt_3d[batch]
