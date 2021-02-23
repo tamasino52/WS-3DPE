@@ -13,39 +13,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from torch_batch_svd import svd
+
 from lib.utils.vis import vis_3d_multiple_skeleton, vis_3d_skeleton
 from lib.core.inference import get_max_preds
 from lib.utils.soft_argmax import SoftArgmax1D, SoftArgmax2D
 from lib.utils.procrustes import criterion_procrustes, compute_similarity_transform_torch
-from lib.core.inference import reconstruct_3d_kps, get_scale_normalized_pose
+from lib.utils.procrustes import batch_compute_similarity_transform_torch as procrustes_align
 from lib.core.inference import PoseReconstructor
-
-
-
-
-'''
-def get_max_preds(batch_heatmap):
-    batch_size = batch_heatmap.shape[0]
-    num_joints = batch_heatmap.shape[1]
-    width = batch_heatmap.shape[3]
-    heatmaps_reshaped = batch_heatmap.view(batch_size, num_joints, -1)
-    maxvals, idx = torch.max(heatmaps_reshaped, 2)
-
-    maxvals = maxvals.view(batch_size, num_joints, 1)
-    idx = idx.view(batch_size, num_joints, 1)
-
-    preds = idx.repeat_interleave(2, 2).type(torch.float32)
-    preds[:, :, 0] = (preds[:, :, 0]) % width
-    preds[:, :, 1] = torch.floor((preds[:, :, 1]) / width)
-
-    pred_mask = torch.gt(maxvals, 0.0).repeat_interleave(2, 2)
-    pred_mask = pred_mask.type(torch.float32)
-
-    preds *= pred_mask
-    return preds, maxvals
-'''
 
 
 class JointsMSELoss(nn.Module):
@@ -159,12 +134,14 @@ class MultiViewConsistencyLoss(nn.Module):
         self.criterion = nn.MSELoss(reduction='mean')
         self.human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
                              (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
+        self.vis = [0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 12, 14, 15, 16, 17, 18, 19]
 
     def forward(self, joints_3ds, target_weights):
         loss = 0
         for batch_root_joints_3d, batch_root_target_weight in zip(joints_3ds, target_weights):
             for batch_joints_3d, batch_target_weight in zip(joints_3ds, target_weights):
-                for b in range(batch_root_joints_3d.shape[0]):
+                '''
+                    for b in range(batch_root_joints_3d.shape[0]):
                     root_joints_3d = batch_root_joints_3d[b]
                     joints_3d = batch_joints_3d[b]
                     root_target_weight = batch_root_target_weight[b]
@@ -176,7 +153,11 @@ class MultiViewConsistencyLoss(nn.Module):
                     joints_3d = joints_3d[target_weight > 0, :]
 
                     joints_3d_hat = compute_similarity_transform_torch(joints_3d, root_joints_3d)
-                    loss += self.criterion(joints_3d_hat, root_joints_3d)
+                    loss += self.criterion(joints_3d_hat, root_joints_3d)            
+                '''
+                trans_kps_3d = procrustes_align(batch_joints_3d[:, self.vis, :], batch_root_joints_3d[:, self.vis, :])
+                loss += self.criterion(trans_kps_3d, batch_root_joints_3d[:, self.vis, :])
+
         return loss
 
 
@@ -205,7 +186,6 @@ class WeaklySupervisedLoss(nn.Module):
             kps_3d_hat = self.pose_reconstructor.infer(heatmap, depthmap, camera)
             limb_length_loss += self.criterion2(kps_3d_hat, limb)
             kps_3d_hat_list.append(kps_3d_hat)
-
         multiview_consistency_loss += self.criterion3(kps_3d_hat_list, target_weights)
         total_loss = joint_mse_loss + self.alpha * multiview_consistency_loss + self.beta * limb_length_loss
         return total_loss, joint_mse_loss, multiview_consistency_loss, limb_length_loss

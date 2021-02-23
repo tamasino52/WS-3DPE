@@ -16,9 +16,9 @@ import numpy as np
 import torch
 
 from core.evaluate import accuracy
-from core.inference import get_final_preds
+from core.inference import get_final_preds, PoseReconstructor
 
-from utils.vis import save_debug_images, save_batch_skeleton
+from lib.utils.vis import PoseVisualizer, save_debug_images
 
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch, output_dir, 
             output_heatmaps.append(output_heatmap)
             output_depthmaps.append(output_depthmap)
 
-        loss, multiview_loss, limb_loss = criterion(output_heatmaps, output_depthmaps, targets, target_weights, cameras, limb)
+        loss, hm_loss, mv_loss, ll_loss = criterion(output_heatmaps, output_depthmaps, targets, target_weights, cameras, limb)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -71,22 +71,25 @@ def train(config, train_loader, model, criterion, optimizer, epoch, output_dir, 
             save_debug_images(config, input, meta, target, pred * 4, output_heatmap, output_depthmap, prefix)
             human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
                             (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
-            save_batch_skeleton(inputs, output_heatmaps, output_depthmaps, metas, human36_edge, '{}_3d.jpg'.format(prefix))
+            visualizer = PoseVisualizer()
+            visualizer.save_batch_kps_3d(inputs, output_heatmaps, output_depthmaps, cameras, '{}_3d.jpg'.format(prefix))
             msg = 'Epoch: [{0}][{1}/{2}]\t' \
                   'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t' \
                   'Speed {speed:.1f} samples/s\t' \
                   'Data {data_time.val:.3f}s ({data_time.avg:.3f}s)\t' \
                   'Loss {loss.val:.5f} ({loss.avg:.5f})\t' \
-                  'MVCLoss {loss2:.5f}\t'\
-                  'LLLoss {loss3:.5f}\t' \
+                  'HMLoss {hm_loss:.5f}\t'\
+                  'MVCLoss {mv_loss:.5f}\t'\
+                  'LLLoss {ll_loss:.5f}\t' \
                   'Accuracy {acc.val:.3f} ({acc.avg:.3f})'.format(
                     epoch, i, len(train_loader),
                     batch_time=batch_time,
                     speed=inputs[0].size(0) * len(inputs) / batch_time.val,
                     data_time=data_time,
                     loss=losses,
-                    loss2=multiview_loss,
-                    loss3=limb_loss,
+                    hm_loss=hm_loss,
+                    mv_loss=mv_loss,
+                    ll_loss=ll_loss,
                     acc=acc)
             logger.info(msg)
             writer = writer_dict['writer']

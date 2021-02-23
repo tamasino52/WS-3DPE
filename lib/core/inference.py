@@ -82,7 +82,7 @@ def get_final_preds(config, batch_heatmaps, center, scale):
 
     return preds, maxvals
 
-
+'''
 def get_scaling_factor(kps_25d):
     """
     We use the mean distance between joints to calculate the scaling factor s.
@@ -156,6 +156,7 @@ def reconstruct_3d_kps(_kps_25d_hat, intrinsic_k):
     kps_3d_hat = (z_root + kps_25d_hat[:, :, 2]).view(-1, 1, 1) * K_inv.bmm(kps_25d_hat.view(-1, 3, 1))
 
     return kps_3d_hat.view(-1, 20, 3)
+'''
 
 
 class PoseReconstructor(nn.Module):
@@ -180,7 +181,7 @@ class PoseReconstructor(nn.Module):
         batch_soft_heatmap = torch.nn.functional.softmax(batch_heatmap.view(b, n, -1), dim=2).view(b, n, h, w)
         batch_soft_depthmap = batch_soft_heatmap.matmul(batch_depthmap)
         depth = batch_soft_depthmap.sum(dim=[2, 3]).unsqueeze(2)
-        heatmap_index = self.SoftArgmax2D(batch_heatmap)
+        heatmap_index = self.soft_argmax(batch_heatmap)
         return torch.cat([heatmap_index, depth], dim=2)
 
     def get_scaling_factor(self, kps_25d):

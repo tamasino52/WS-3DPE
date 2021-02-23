@@ -9,8 +9,6 @@ from __future__ import division
 from __future__ import print_function
 
 import math
-import torch
-import torch.nn.functional as F
 import numpy as np
 import torchvision
 import cv2
@@ -18,11 +16,97 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-from core.inference import get_max_preds
-from core.inference import get_scaling_factor
-from core.inference import get_scale_normalized_pose
-from core.inference import get_z_root
-from core.inference import reconstruct_3d_kps
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+from lib.core.inference import get_max_preds
+from lib.core.inference import PoseReconstructor
+
+
+class PoseVisualizer(PoseReconstructor):
+    def __init__(self):
+        super(PoseVisualizer, self).__init__()
+        self.softmax = nn.Softmax(dim=2)
+        self.h36m_pair = [
+            (0, 7), (7, 8), (8, 9), (9, 10), (8, 11), (11, 12), (12, 13), (8, 14), (14, 15), (15, 16), (0, 1), (1, 2),
+            (2, 3), (0, 4), (4, 5), (5, 6)]
+        self.union_pair = [
+            (0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
+            (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
+
+    def softmax2d(self, x):
+        B, C, W, H = x.size()
+        x_flat = x.view((B, C, W*H))
+        x_softmax = self.softmax(x_flat)
+        return x_softmax.view((B, C, W, H))
+
+    def draw_3d_plot(self, ax, kps_3d):
+        for l in range(len(self.union_pair)):
+            i1 = self.union_pair[l][0]
+            i2 = self.union_pair[l][1]
+
+            x = np.array([kps_3d[i1, 0], kps_3d[i2, 0]])
+            y = np.array([kps_3d[i1, 1], kps_3d[i2, 1]])
+            z = np.array([kps_3d[i1, 2], kps_3d[i2, 2]])
+
+            ax.plot(x, z, -y, linewidth=2)
+            ax.scatter(kps_3d[i1, 0], kps_3d[i1, 2], -kps_3d[i1, 1], marker='o')
+            ax.scatter(kps_3d[i2, 0], kps_3d[i2, 2], -kps_3d[i2, 1], marker='o')
+
+            ax.set_xlabel('X')
+            ax.set_ylabel('D')
+            ax.set_zlabel('Y')
+
+            # ax.set_xlim(0, 64)
+            # ax.set_ylim(-32, 32)
+            # ax.set_zlim(-64, 0)
+
+    def save_batch_kps_3d(self, batch_image_list, batch_heatmap_list, batch_depthmap_list, camera_list, file_name):
+        '''
+        batch_image: [batch_size, channel, height, width]
+        batch_heatmap_list: [['batch_size, num_joints, height, width] ...]
+        batch_depthmap_list: [['batch_size, num_joints, height, width] ...]
+
+        file_name: saved file name
+        '''
+
+        view_size = len(batch_heatmap_list)
+        batch_size = batch_heatmap_list[0].size(0)
+
+        fig = plt.figure(figsize=(12 * view_size, 6 * batch_size))
+
+        kps_3d_list = []
+        idx = 0
+        for img, hm, dm, cam in zip(batch_image_list, batch_heatmap_list, batch_depthmap_list, camera_list):
+            kps_3d = self.infer(hm, dm, cam)
+            kps_3d_list.append(kps_3d)
+
+            for batch in range(batch_size):
+                # Image show
+                idx += 1
+                ax = fig.add_subplot(batch_size, (2 * view_size), idx)
+                ax.axes.xaxis.set_visible(False)
+                ax.axes.yaxis.set_visible(False)
+
+                min = float(img.min())
+                max = float(img.max())
+
+                img.add_(-min).div_(max - min + 1e-5)
+                img = img[batch].mul(255) \
+                    .clamp(0, 255) \
+                    .byte() \
+                    .permute(1, 2, 0) \
+                    .cpu().numpy()
+
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                ax.imshow(img, vmin=0, vmax=255)
+                idx += 1
+                ax = fig.add_subplot(batch_size, (2 * view_size), idx + 1, projection='3d')
+                self.draw_3d_plot(ax, kps_3d[batch].detach().cpu().numpy())
+
+        plt.savefig(file_name)
+        plt.close(fig)
 
 
 def save_batch_image_with_joints(batch_image, batch_joints, batch_joints_vis,
@@ -178,96 +262,6 @@ def save_batch_depthmaps(batch_image, batch_heatmaps, file_name,
         grid_image[height_begin:height_end, 0:heatmap_width, :] = resized_image
 
     cv2.imwrite(file_name, grid_image)
-
-
-def save_batch_skeleton(batch_image_list, batch_heatmap_list, batch_depthmap_list, batch_meta_list, kps_lines, file_name):
-    '''
-    batch_image: [batch_size, channel, height, width]
-    batch_heatmap_list: [['batch_size, num_joints, height, width] ...]
-    batch_depthmap_list: [['batch_size, num_joints, height, width] ...]
-
-    file_name: saved file name
-    '''
-
-    view_size = len(batch_heatmap_list)
-    batch_size = batch_heatmap_list[0].size(0)
-
-    fig = plt.figure(figsize=(12 * view_size, 6 * batch_size))
-    idx = 1
-    for batch in range(batch_size):
-        for view in range(view_size):
-            batch_heatmaps = batch_heatmap_list[view]
-            batch_depthmaps = batch_depthmap_list[view]
-            batch_images = batch_image_list[view]
-            batch_kpt_3d_vis = batch_meta_list[view]['joints_vis']
-            kpt_3d_vis = batch_kpt_3d_vis[batch]
-
-            b, n, h, w = batch_heatmaps.shape
-
-            preds, maxvals = get_max_preds(batch_heatmaps.detach().cpu().numpy())
-
-            batch_soft_heatmap = F.softmax(batch_heatmaps.view(b, n, -1), dim=2).view(b, n, h, w)
-            batch_soft_depthmap = batch_soft_heatmap.matmul(batch_depthmaps)
-            depth = batch_soft_depthmap.sum(dim=[2, 3]).unsqueeze(2)
-            kps_25d = torch.cat([preds, depth], dim=2)
-
-            kps_25d_hat = get_scale_normalized_pose(kps_25d)
-            kps_3d_hat = reconstruct_3d_kps(kps_25d_hat, camera)
-
-            batch_depths = (batch_depthmaps * batch_heatmaps).sum([2, 3]).unsqueeze(2).detach().cpu().numpy()
-            batch_kpt_3d = np.concatenate((preds, batch_depths), axis=2)
-
-            kpt_3d = batch_kpt_3d[batch]
-
-            # Image show
-            ax = fig.add_subplot(batch_size, (2 * view_size), idx)
-            ax.axes.xaxis.set_visible(False)
-            ax.axes.yaxis.set_visible(False)
-
-            batch_images = batch_images.clone()
-            min = float(batch_images.min())
-            max = float(batch_images.max())
-
-            batch_images.add_(-min).div_(max - min + 1e-5)
-
-            image = batch_images[batch].mul(255) \
-                .clamp(0, 255) \
-                .byte() \
-                .permute(1, 2, 0) \
-                .cpu().numpy()
-
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-            ax.imshow(image, vmin=0, vmax=255)
-
-            # 3D plot
-            ax = fig.add_subplot(batch_size, (2 * view_size), idx + 1, projection='3d')
-
-            for l in range(len(kps_lines)):
-                i1 = kps_lines[l][0]
-                i2 = kps_lines[l][1]
-
-                x = np.array([kpt_3d[i1, 0], kpt_3d[i2, 0]])
-                y = np.array([kpt_3d[i1, 1], kpt_3d[i2, 1]])
-                z = np.array([kpt_3d[i1, 2], kpt_3d[i2, 2]])
-
-                if kpt_3d_vis[i1, 0] > 0 and kpt_3d_vis[i2, 0] > 0:
-                    ax.plot(x, z, -y, linewidth=2)
-                if kpt_3d_vis[i1, 0] > 0:
-                    ax.scatter(kpt_3d[i1, 0], kpt_3d[i1, 2], -kpt_3d[i1, 1], marker='o')
-                if kpt_3d_vis[i2, 0] > 0:
-                    ax.scatter(kpt_3d[i2, 0], kpt_3d[i2, 2], -kpt_3d[i2, 1], marker='o')
-                ax.set_xlabel('X')
-                ax.set_ylabel('D')
-                ax.set_zlabel('Y')
-                #ax.set_xlim(0, 64)
-                #ax.set_ylim(-32, 32)
-                #ax.set_zlim(-64, 0)
-
-            idx += 2
-    plt.savefig(file_name)
-    plt.close(fig)
-
 
 def save_debug_images(config, input, meta, target, joints_pred, output, depth=None, prefix=None):
     if not config.DEBUG.DEBUG:
