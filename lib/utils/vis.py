@@ -34,6 +34,7 @@ class PoseVisualizer(PoseReconstructor):
         self.union_pair = [
             (0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
             (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
+        self.cmap = ['r', 'g', 'b', 'y']
 
     def softmax2d(self, x):
         B, C, W, H = x.size()
@@ -41,7 +42,20 @@ class PoseVisualizer(PoseReconstructor):
         x_softmax = self.softmax(x_flat)
         return x_softmax.view((B, C, W, H))
 
-    def draw_3d_plot(self, ax, kps_3d):
+    def normalize_img(self, image):
+        min = float(image.min())
+        max = float(image.max())
+
+        image.add_(-min).div_(max - min + 1e-5)
+        image = image.mul(255) \
+            .clamp(0, 255) \
+            .byte() \
+            .permute(1, 2, 0) \
+            .cpu().numpy()
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        return image
+
+    def draw_3d_plot(self, ax, kps_3d, color='r'):
         for l in range(len(self.union_pair)):
             i1 = self.union_pair[l][0]
             i2 = self.union_pair[l][1]
@@ -50,17 +64,19 @@ class PoseVisualizer(PoseReconstructor):
             y = np.array([kps_3d[i1, 1], kps_3d[i2, 1]])
             z = np.array([kps_3d[i1, 2], kps_3d[i2, 2]])
 
-            ax.plot(x, z, -y, linewidth=2)
-            ax.scatter(kps_3d[i1, 0], kps_3d[i1, 2], -kps_3d[i1, 1], marker='o')
-            ax.scatter(kps_3d[i2, 0], kps_3d[i2, 2], -kps_3d[i2, 1], marker='o')
+            ax.plot(x, -y, z, linewidth=2, color=color)
+            ax.scatter(kps_3d[i1, 0], -kps_3d[i1, 1], kps_3d[i1, 2], marker='o', color=color)
+            ax.scatter(kps_3d[i2, 0], -kps_3d[i2, 1], kps_3d[i2, 2], marker='o', color=color)
 
             ax.set_xlabel('X')
-            ax.set_ylabel('D')
-            ax.set_zlabel('Y')
+            ax.set_ylabel('Y')
+            ax.set_zlabel('D')
 
             # ax.set_xlim(0, 64)
             # ax.set_ylim(-32, 32)
             # ax.set_zlim(-64, 0)
+
+            return ax
 
     def save_batch_kps_3d(self, batch_image_list, batch_heatmap_list, batch_depthmap_list, camera_list, file_name):
         '''
@@ -77,33 +93,22 @@ class PoseVisualizer(PoseReconstructor):
         fig = plt.figure(figsize=(12 * view_size, 6 * batch_size))
 
         kps_3d_list = []
-        idx = 0
-        for img, hm, dm, cam in zip(batch_image_list, batch_heatmap_list, batch_depthmap_list, camera_list):
+        data = zip(batch_image_list, batch_heatmap_list, batch_depthmap_list, camera_list)
+        for view, (img, hm, dm, cam) in enumerate(data):
             kps_3d = self.infer(hm, dm, cam)
             kps_3d_list.append(kps_3d)
 
             for batch in range(batch_size):
-                # Image show
-                idx += 1
-                ax = fig.add_subplot(batch_size, (2 * view_size), idx)
+                image = img[batch]
+
+                ax = fig.add_subplot(batch_size, (2 * view_size), (batch * 2 * view_size) + 2 * view + 1)
                 ax.axes.xaxis.set_visible(False)
                 ax.axes.yaxis.set_visible(False)
 
-                min = float(img.min())
-                max = float(img.max())
-
-                img.add_(-min).div_(max - min + 1e-5)
-                img = img[batch].mul(255) \
-                    .clamp(0, 255) \
-                    .byte() \
-                    .permute(1, 2, 0) \
-                    .cpu().numpy()
-
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                ax.imshow(img, vmin=0, vmax=255)
-                idx += 1
-                ax = fig.add_subplot(batch_size, (2 * view_size), idx + 1, projection='3d')
-                self.draw_3d_plot(ax, kps_3d[batch].detach().cpu().numpy())
+                image = self.normalize_img(image)
+                ax.imshow(image, vmin=0, vmax=255)
+                ax = fig.add_subplot(batch_size, (2 * view_size), (batch * 2 * view_size) + 2 * view + 2, projection='3d')
+                self.draw_3d_plot(ax, kps_3d[batch].detach().cpu().numpy(), self.cmap[view])
 
         plt.savefig(file_name)
         plt.close(fig)

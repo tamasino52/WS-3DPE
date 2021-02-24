@@ -120,10 +120,11 @@ class LimbLengthLoss(nn.Module):
     def forward(self, joints_3d, avg_limb):
         loss = 0
         length_gt = avg_limb.clone()
-        length_gt_hat = length_gt.unsqueeze(2) / length_gt.mean()
+        length_gt_hat = length_gt.unsqueeze(2)
 
         length_pred = self.get_limb_length(joints_3d)
-        length_pred_hat = length_pred.unsqueeze(2) / length_pred.mean(1).view(-1, 1, 1)
+        s = (((joints_3d[:, 0, :] - joints_3d[:, 9, :]) ** 2).sum(1) ** 0.5)
+        length_pred_hat = length_pred.unsqueeze(2) / s.view(-1, 1, 1)
         loss += self.criterion(length_gt_hat, length_pred_hat)
         return loss
 
@@ -170,7 +171,7 @@ class WeaklySupervisedLoss(nn.Module):
         self.mse = nn.MSELoss(reduction='mean')
         self.use_target_weight = use_target_weight
         self.alpha = 1.0
-        self.beta = 10.0
+        self.beta = 1.0
         self.pose_reconstructor = PoseReconstructor()
 
     def forward(self, hm_outputs, dm_outputs, targets, target_weights, cameras, limb):

@@ -69,8 +69,6 @@ def train(config, train_loader, model, criterion, optimizer, epoch, output_dir, 
             acc.update(avg_acc, cnt)
             prefix = '{}_{}'.format(os.path.join(output_dir, 'train'), i)
             save_debug_images(config, input, meta, target, pred * 4, output_heatmap, output_depthmap, prefix)
-            human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
-                            (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
             visualizer = PoseVisualizer()
             visualizer.save_batch_kps_3d(inputs, output_heatmaps, output_depthmaps, cameras, '{}_3d.jpg'.format(prefix))
             msg = 'Epoch: [{0}][{1}/{2}]\t' \
