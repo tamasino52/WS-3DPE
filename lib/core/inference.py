@@ -82,82 +82,6 @@ def get_final_preds(config, batch_heatmaps, center, scale):
 
     return preds, maxvals
 
-'''
-def get_scaling_factor(kps_25d):
-    """
-    We use the mean distance between joints to calculate the scaling factor s.
-    Args:
-        kps_25d:
-            Batch 2.5D KeyPoints (Shape = [Batch, Joint, X, Y, Relative Z])
-    Returns:
-        Batch Scaling Factor s
-    """
-    human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
-                    (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
-    parent = kps_25d[:, [item[0] for item in human36_edge], :]
-    child = kps_25d[:, [item[1] for item in human36_edge], :]
-    dist = torch.norm(parent - child, dim=2).unsqueeze(2)
-    s = dist.sum([1, 2]).view(-1, 1)
-    return s
-
-
-def get_scale_normalized_pose(kps_25d):
-    """
-    Args:
-        kps_25d:
-            Batch 2.5D KeyPoints (Shape = [Batch, Joint, X, Y, Relative Z])
-    Returns:
-        Batch Scale Normalized 2.5D Pose (Shape = [Batch, Joint, X, Y, Relative Z])
-    """
-    s = get_scaling_factor(kps_25d)
-    if s is not 0.0:
-        kps_25d_hat = kps_25d / s.unsqueeze(2)
-    else:
-        kps_25d_hat = kps_25d
-    return kps_25d_hat
-
-
-def get_z_root(kps_25d_hat):
-    x1 = kps_25d_hat[:, 0, 0]
-    y1 = kps_25d_hat[:, 0, 1]
-    z1 = kps_25d_hat[:, 0, 2]
-
-    x2 = kps_25d_hat[:, 8, 0]
-    y2 = kps_25d_hat[:, 8, 1]
-    z2 = kps_25d_hat[:, 8, 2]
-
-    a = (x1 - x2) ** 2 + (y1 - y2) ** 2
-    b = z1 * (x1 ** 2 + y1 ** 2 - x1 * x2 - y1 * y2) + z2 * (x2 ** 2 + y2 ** 2 - x1 * x2 - y1 * y2)
-    c = (x1 * z1 - x2 * z2) ** 2 + (y1 * z1 - y2 * z2) ** 2 + (z1 - z2) ** 2 - 1
-
-    discriminant = b ** 2 - 4 * a * c
-    discriminant[discriminant < 0] = (b ** 2 + 4 * a * c)[discriminant < 0]
-
-    z_root = 0.5 * (discriminant ** 0.5) / a
-
-    return z_root.view(-1, 1)
-
-
-def reconstruct_3d_kps(_kps_25d_hat, intrinsic_k):
-    """
-    Args:
-        _kps_25d_hat:
-            Batch Scale Normalized 2.5D KeyPoints (Shape = [Batch, Joint, 3] // X, Y, Relative Z)
-        intrinsic_k:
-            Intrinsic Camera Matrix Batch * [[fx, 0, cx], [0, fy, cy], [0, 0, 1]]
-    Returns:
-        Batch 3D KeyPoints (Shape = [Batch, Joint, 3])
-    """
-    z_root = get_z_root(_kps_25d_hat)
-    kps_25d_hat = _kps_25d_hat.clone()
-    K_inv = intrinsic_k.inverse()
-    K_inv = K_inv.repeat(20, 1, 1)
-    kps_25d_hat[:, :, 2] = 1
-    kps_3d_hat = (z_root + kps_25d_hat[:, :, 2]).view(-1, 1, 1) * K_inv.bmm(kps_25d_hat.view(-1, 3, 1))
-
-    return kps_3d_hat.view(-1, 20, 3)
-'''
-
 
 class PoseReconstructor(nn.Module):
     def __init__(self):
@@ -171,8 +95,9 @@ class PoseReconstructor(nn.Module):
         kps_25d = self.get_kps_25d(hm, dm)
         s = self.get_scaling_factor(kps_25d)
         kps_25d_hat = self.get_scale_normalized_pose(kps_25d, s)
-        kps_3d_hat = self.reconstruct_3d_kps(kps_25d_hat, cam)
-        return kps_3d_hat
+        return kps_25d_hat
+        #kps_3d_hat = self.reconstruct_3d_kps(kps_25d_hat, cam)
+        #return kps_3d_hat
 
     def get_kps_25d(self, batch_heatmap, batch_depthmap):
         for h, d in zip(batch_heatmap.shape, batch_depthmap.shape):

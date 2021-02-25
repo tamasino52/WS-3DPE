@@ -23,7 +23,7 @@ config.BACKBONE_MODEL = 'pose_hrnet'
 config.MODEL = 'multiview_pose_hrnet'
 config.GPUS = '0,1'
 config.WORKERS = 24
-config.PRINT_FREQ = 100
+config.PRINT_FREQ = 500
 
 # hrnet definition
 config.MODEL_EXTRA = edict()

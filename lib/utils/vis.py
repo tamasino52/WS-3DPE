@@ -13,6 +13,7 @@ import numpy as np
 import torchvision
 import cv2
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
@@ -56,27 +57,32 @@ class PoseVisualizer(PoseReconstructor):
         return image
 
     def draw_3d_plot(self, ax, kps_3d, color='r'):
-        for l in range(len(self.union_pair)):
-            i1 = self.union_pair[l][0]
-            i2 = self.union_pair[l][1]
+        i1 = [self.union_pair[idx][0] for idx in range(len(self.union_pair))]
+        i2 = [self.union_pair[idx][1] for idx in range(len(self.union_pair))]
 
-            x = np.array([kps_3d[i1, 0], kps_3d[i2, 0]])
-            y = np.array([kps_3d[i1, 1], kps_3d[i2, 1]])
-            z = np.array([kps_3d[i1, 2], kps_3d[i2, 2]])
+        for idx in range(len(self.union_pair)):
+            x = np.array([kps_3d[i1[idx], 0], kps_3d[i2[idx], 0]])
+            y = np.array([kps_3d[i1[idx], 2], kps_3d[i2[idx], 2]])
+            z = -np.array([kps_3d[i1[idx], 1], kps_3d[i2[idx], 1]])
+            ax.plot(x, y, z, linewidth=2, color=color)
 
-            ax.plot(x, -y, z, linewidth=2, color=color)
-            ax.scatter(kps_3d[i1, 0], -kps_3d[i1, 1], kps_3d[i1, 2], marker='o', color=color)
-            ax.scatter(kps_3d[i2, 0], -kps_3d[i2, 1], kps_3d[i2, 2], marker='o', color=color)
+        ax.scatter(kps_3d[i1, 0], kps_3d[i1, 2], -kps_3d[i1, 1], marker='o', color=color)
+        ax.scatter(kps_3d[i2, 0], kps_3d[i2, 2], -kps_3d[i2, 1], marker='o', color=color)
+        '''
+        max_range = np.array([x.max() - x.min(), y.max() - y.min(), z.max() - z.min()]).max()
+        Xb = 0.5 * max_range * np.mgrid[-1:2:2, -1:2:2, -1:2:2][0].flatten() + 0.5 * (x.max() + x.min())
+        Yb = 0.5 * max_range * np.mgrid[-1:2:2, -1:2:2, -1:2:2][1].flatten() + 0.5 * (y.max() + y.min())
+        Zb = 0.5 * max_range * np.mgrid[-1:2:2, -1:2:2, -1:2:2][2].flatten() + 0.5 * (z.max() + z.min())
+        # Comment or uncomment following both lines to test the fake bounding box:
+        for xb, yb, zb in zip(Xb, Yb, Zb):
+            ax.plot([xb], [yb], [zb], 'w')
+        '''
 
-            ax.set_xlabel('X')
-            ax.set_ylabel('Y')
-            ax.set_zlabel('D')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Z')
+        ax.set_zlabel('Y')
 
-            # ax.set_xlim(0, 64)
-            # ax.set_ylim(-32, 32)
-            # ax.set_zlim(-64, 0)
-
-            return ax
+        return ax
 
     def save_batch_kps_3d(self, batch_image_list, batch_heatmap_list, batch_depthmap_list, camera_list, file_name):
         '''
@@ -114,8 +120,7 @@ class PoseVisualizer(PoseReconstructor):
         plt.close(fig)
 
 
-def save_batch_image_with_joints(batch_image, batch_joints, batch_joints_vis,
-                                 file_name, nrow=8, padding=2):
+def save_batch_image_with_joints(batch_image, batch_joints, batch_joints_vis, file_name, nrow=8, padding=2):
     '''
     batch_image: [batch_size, channel, height, width]
     batch_joints: [batch_size, num_joints, 3],
@@ -148,8 +153,7 @@ def save_batch_image_with_joints(batch_image, batch_joints, batch_joints_vis,
     cv2.imwrite(file_name, ndarr)
 
 
-def save_batch_heatmaps(batch_image, batch_heatmaps, file_name,
-                        normalize=True):
+def save_batch_heatmaps(batch_image, batch_heatmaps, file_name, normalize=True):
     '''
     batch_image: [batch_size, channel, height, width]
     batch_heatmaps: ['batch_size, num_joints, height, width]
@@ -213,8 +217,7 @@ def save_batch_heatmaps(batch_image, batch_heatmaps, file_name,
     cv2.imwrite(file_name, grid_image)
 
 
-def save_batch_depthmaps(batch_image, batch_heatmaps, file_name,
-                        normalize=True):
+def save_batch_depthmaps(batch_image, batch_heatmaps, file_name, normalize=True):
     '''
     batch_image: [batch_size, channel, height, width]
     batch_heatmaps: ['batch_size, num_joints, height, width]
@@ -267,6 +270,7 @@ def save_batch_depthmaps(batch_image, batch_heatmaps, file_name,
         grid_image[height_begin:height_end, 0:heatmap_width, :] = resized_image
 
     cv2.imwrite(file_name, grid_image)
+
 
 def save_debug_images(config, input, meta, target, joints_pred, output, depth=None, prefix=None):
     if not config.DEBUG.DEBUG:
@@ -403,3 +407,40 @@ def vis_3d_multiple_skeleton(kpt_3d, kpt_3d_vis, kps_lines, filename=None):
 
     plt.show()
     cv2.waitKey(0)
+
+
+def show3Dpose(channels, ax, radius=40, mpii=2, lcolor='#ff0000', rcolor='#0000ff'):
+    vals = channels
+
+    if mpii == 0: # h36m with mpii joints
+        connections = [[0, 1], [1, 2], [2, 3], [0, 4], [4, 5],
+                       [5, 6], [0, 8], [8, 9], [9, 10],
+                       [8, 11], [11, 12], [12, 13], [8, 14], [14, 15], [15, 16]]
+        LR = np.array([0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1], dtype=bool)
+    elif mpii == 1: # only mpii
+        connections = [[0, 1], [1, 2], [2, 6], [6, 3], [3, 4], [4, 5], [6, 7],
+                       [7, 8], [8, 9], [7, 12], [12, 11], [11, 10], [7, 13], [13, 14], [14, 15]]
+        LR = np.array([0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1], dtype=bool)
+    else: # default h36m
+        connections = [[0, 1], [1, 2], [2, 3], [0, 4], [4, 5],
+                       [5, 6], [0, 7], [7, 8], [8, 9], [9, 10],
+                       [8, 11], [11, 12], [12, 13], [8, 14], [14, 15], [15, 16]]
+
+        LR = np.array([0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0], dtype=bool)
+
+    for ind, (i,j) in enumerate(connections):
+        x, y, z = [np.array([vals[i, c], vals[j, c]]) for c in range(3)]
+        ax.plot(x, y, z, lw=2, c=lcolor if LR[ind] else rcolor)
+
+    RADIUS = radius  # space around the subject
+    if mpii == 1:
+        xroot, yroot, zroot = vals[6, 0], vals[6, 1], vals[6, 2]
+    else:
+        xroot, yroot, zroot = vals[0, 0], vals[0, 1], vals[0, 2]
+    ax.set_xlim3d([-RADIUS + xroot, RADIUS + xroot])
+    ax.set_zlim3d([-RADIUS + zroot, RADIUS + zroot])
+    ax.set_ylim3d([-RADIUS + yroot, RADIUS + yroot])
+
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")

@@ -50,6 +50,33 @@ class JointsMSELoss(nn.Module):
         return loss / num_joints
 
 
+class JointMPJPELoss(nn.Module):
+    def __init__(self):
+        super(JointMPJPELoss, self).__init__()
+
+    def forward(self, joint_3d, gt, joints_vis_3d=None, output_batch_mpjpe=False):
+        """
+        :param joint_3d: (batch, njoint, 3)
+        :param gt:
+        :param joints_vis_3d: (batch, njoint, 1), values are 0,1
+        :param output_batch_mpjpe: bool
+        :return:
+        """
+        if joints_vis_3d is None:
+            joints_vis_3d = torch.ones_like(joint_3d)[:, :, 0:1]
+        l2_distance = torch.sqrt(((joint_3d - gt)**2).sum(dim=2))
+        joints_vis_3d = joints_vis_3d.view(*l2_distance.shape)
+        masked_l2_distance = l2_distance * joints_vis_3d
+        n_valid_joints = torch.sum(joints_vis_3d, dim=1)
+        # if (n_valid_joints < 1).sum() > 0:
+        n_valid_joints[n_valid_joints < 1] = 1  # avoid div 0
+        avg_mpjpe = torch.sum(masked_l2_distance) / n_valid_joints.sum()
+        if output_batch_mpjpe:
+            return avg_mpjpe, masked_l2_distance, n_valid_joints.sum()
+        else:
+            return avg_mpjpe#, n_valid_joints.sum()
+
+
 class JointsOHKMMSELoss(nn.Module):
     def __init__(self, use_target_weight, topk=8):
         super(JointsOHKMMSELoss, self).__init__()
@@ -118,27 +145,23 @@ class LimbLengthLoss(nn.Module):
     '''
 
     def forward(self, joints_3d, avg_limb):
-        loss = 0
+        loss = 0.0
         length_gt = avg_limb.clone()
-        length_gt_hat = length_gt.unsqueeze(2)
-
         length_pred = self.get_limb_length(joints_3d)
-        s = (((joints_3d[:, 0, :] - joints_3d[:, 9, :]) ** 2).sum(1) ** 0.5)
-        length_pred_hat = length_pred.unsqueeze(2) / s.view(-1, 1, 1)
-        loss += self.criterion(length_gt_hat, length_pred_hat)
+        loss += self.criterion(length_gt, length_pred)
         return loss
 
 
 class MultiViewConsistencyLoss(nn.Module):
     def __init__(self):
         super(MultiViewConsistencyLoss, self).__init__()
-        self.criterion = nn.MSELoss(reduction='mean')
+        self.criterion = JointMPJPELoss()
         self.human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
                              (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
         self.vis = [0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 12, 14, 15, 16, 17, 18, 19]
 
     def forward(self, joints_3ds, target_weights):
-        loss = 0
+        loss = 0.0
         for batch_root_joints_3d, batch_root_target_weight in zip(joints_3ds, target_weights):
             for batch_joints_3d, batch_target_weight in zip(joints_3ds, target_weights):
                 '''
@@ -156,8 +179,9 @@ class MultiViewConsistencyLoss(nn.Module):
                     joints_3d_hat = compute_similarity_transform_torch(joints_3d, root_joints_3d)
                     loss += self.criterion(joints_3d_hat, root_joints_3d)            
                 '''
-                trans_kps_3d = procrustes_align(batch_joints_3d[:, self.vis, :], batch_root_joints_3d[:, self.vis, :])
-                loss += self.criterion(trans_kps_3d, batch_root_joints_3d[:, self.vis, :])
+                #trans_kps_3d = criterion_procrustes(batch_joints_3d, batch_root_joints_3d)
+                for joints_3d, root_joints_3d in zip(batch_joints_3d, batch_root_joints_3d):
+                    loss += criterion_procrustes(joints_3d[self.vis, :], root_joints_3d[self.vis, :]) #self.criterion(trans_kps_3d, batch_root_joints_3d, batch_target_weight)
 
         return loss
 
@@ -170,8 +194,8 @@ class WeaklySupervisedLoss(nn.Module):
         self.criterion3 = MultiViewConsistencyLoss()
         self.mse = nn.MSELoss(reduction='mean')
         self.use_target_weight = use_target_weight
-        self.alpha = 1.0
-        self.beta = 1.0
+        self.alpha = 0.01
+        self.beta = 0.1
         self.pose_reconstructor = PoseReconstructor()
 
     def forward(self, hm_outputs, dm_outputs, targets, target_weights, cameras, limb):
@@ -188,35 +212,8 @@ class WeaklySupervisedLoss(nn.Module):
             limb_length_loss += self.criterion2(kps_3d_hat, limb)
             kps_3d_hat_list.append(kps_3d_hat)
         multiview_consistency_loss += self.criterion3(kps_3d_hat_list, target_weights)
-        total_loss = joint_mse_loss + self.alpha * multiview_consistency_loss + self.beta * limb_length_loss
+        total_loss = joint_mse_loss + self.beta * limb_length_loss + self.alpha * multiview_consistency_loss
         return total_loss, joint_mse_loss, multiview_consistency_loss, limb_length_loss
-
-
-class JointMPJPELoss(nn.Module):
-    def __init__(self):
-        super(JointMPJPELoss, self).__init__()
-
-    def forward(self, joint_3d, gt, joints_vis_3d=None, output_batch_mpjpe=False):
-        """
-        :param joint_3d: (batch, njoint, 3)
-        :param gt: (batch, njoint, 3)
-        :param joints_vis_3d: (batch, njoint, 1), values are 0,1
-        :param output_batch_mpjpe: bool
-        :return:
-        """
-        if joints_vis_3d is None:
-            joints_vis_3d = torch.ones_like(joint_3d)[:,:,0:1]
-        l2_distance = 1
-        joints_vis_3d = joints_vis_3d.view(*l2_distance.shape)
-        masked_l2_distance = l2_distance * joints_vis_3d
-        n_valid_joints = torch.sum(joints_vis_3d, dim=1)
-        # if (n_valid_joints < 1).sum() > 0:
-        n_valid_joints[n_valid_joints < 1] = 1  # avoid div 0
-        avg_mpjpe = torch.sum(masked_l2_distance) / n_valid_joints.sum()
-        if output_batch_mpjpe:
-            return avg_mpjpe, masked_l2_distance, n_valid_joints.sum()
-        else:
-            return avg_mpjpe, n_valid_joints.sum()
 
 
 class Joint2dSmoothLoss(nn.Module):
