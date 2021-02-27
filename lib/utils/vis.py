@@ -23,6 +23,7 @@ import torch.nn.functional as F
 
 from lib.core.inference import get_max_preds
 from lib.core.inference import PoseReconstructor
+from lib.utils.procrustes import compute_similarity_transform_torch as procrustes_trans
 
 
 class PoseVisualizer(PoseReconstructor):
@@ -64,7 +65,7 @@ class PoseVisualizer(PoseReconstructor):
             x = np.array([kps_3d[i1[idx], 0], kps_3d[i2[idx], 0]])
             y = np.array([kps_3d[i1[idx], 2], kps_3d[i2[idx], 2]])
             z = -np.array([kps_3d[i1[idx], 1], kps_3d[i2[idx], 1]])
-            ax.plot(x, y, z, linewidth=2, color=color)
+            ax.plot(x, y, z, linewidth=2, color='k')
 
         ax.scatter(kps_3d[i1, 0], kps_3d[i1, 2], -kps_3d[i1, 1], marker='o', color=color)
         ax.scatter(kps_3d[i2, 0], kps_3d[i2, 2], -kps_3d[i2, 1], marker='o', color=color)
@@ -98,23 +99,31 @@ class PoseVisualizer(PoseReconstructor):
 
         fig = plt.figure(figsize=(12 * view_size, 6 * batch_size))
 
-        kps_3d_list = []
+        ax_list = []
+        for batch in range(batch_size):
+            ax = fig.add_subplot(batch_size, 2 * view_size + 1, ((batch + 1) * (2 * view_size + 1)), projection='3d')
+            ax.set_title('Rigid combination')
+            ax_list.append(ax)
+
         data = zip(batch_image_list, batch_heatmap_list, batch_depthmap_list, camera_list)
         for view, (img, hm, dm, cam) in enumerate(data):
             kps_3d = self.infer(hm, dm, cam)
-            kps_3d_list.append(kps_3d)
+            if view is 0:
+                root_kps_3d = kps_3d
 
             for batch in range(batch_size):
                 image = img[batch]
 
-                ax = fig.add_subplot(batch_size, (2 * view_size), (batch * 2 * view_size) + 2 * view + 1)
+                ax = fig.add_subplot(batch_size, 2 * view_size + 1, (batch * (2 * view_size + 1)) + 2 * view + 1)
                 ax.axes.xaxis.set_visible(False)
                 ax.axes.yaxis.set_visible(False)
 
                 image = self.normalize_img(image)
                 ax.imshow(image, vmin=0, vmax=255)
-                ax = fig.add_subplot(batch_size, (2 * view_size), (batch * 2 * view_size) + 2 * view + 2, projection='3d')
+                ax = fig.add_subplot(batch_size, 2 * view_size + 1, (batch * (2 * view_size + 1)) + 2 * view + 2, projection='3d')
                 self.draw_3d_plot(ax, kps_3d[batch].detach().cpu().numpy(), self.cmap[view])
+                kps_trans = procrustes_trans(kps_3d[batch], root_kps_3d[batch])
+                self.draw_3d_plot(ax_list[batch], kps_trans.detach().cpu().numpy(), self.cmap[view])
 
         plt.savefig(file_name)
         plt.close(fig)

@@ -140,7 +140,7 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_l
                 output_heatmaps.append(output_heatmap)
                 output_depthmaps.append(output_depthmap)
 
-            loss = criterion(output_heatmaps, output_depthmaps, targets, target_weights, cameras, limb)
+            loss, hm_loss, mv_loss, ll_loss = criterion(output_heatmaps, output_depthmaps, targets, target_weights, cameras, limb)
 
             num_images = inputs[0].size(0)
             # measure accuracy and record loss
@@ -186,18 +186,35 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_l
                 #idx += num_images
 
             if i % config.PRINT_FREQ == 0:
+
                 msg = 'Test: [{0}/{1}]\t' \
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t' \
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t' \
+                      'HMLoss {hm_loss:.5f}\t' \
+                      'MVCLoss {mv_loss:.5f}\t' \
+                      'LLLoss {ll_loss:.5f}\t' \
                       'Accuracy {acc.val:.3f} ({acc.avg:.3f})'.format(
                           i, len(val_loader), batch_time=batch_time,
-                          loss=losses, acc=acc)
+                          loss=losses,
+                          acc=acc,
+                          hm_loss=hm_loss,
+                          mv_loss=mv_loss,
+                          ll_loss=ll_loss,
+                          )
                 logger.info(msg)
 
                 prefix = '{}_{}'.format(
                     os.path.join(output_dir, 'val'), i
                 )
                 save_debug_images(config, input, meta, target, pred*4, output_heatmap, output_depthmap, prefix)
+        if i % config.PRINT_FREQ == 0:
+            _, avg_acc, cnt, pred = accuracy(output_heatmap.detach().cpu().numpy(), target.detach().cpu().numpy())
+            acc.update(avg_acc, cnt)
+            prefix = '{}_{}'.format(os.path.join(output_dir, 'train'), i)
+            save_debug_images(config, input, meta, target, pred * 4, output_heatmap, output_depthmap, prefix)
+            visualizer = PoseVisualizer()
+            visualizer.save_batch_kps_3d(inputs, output_heatmaps, output_depthmaps, cameras, '{}_3d.jpg'.format(prefix))
+
 
         all_preds = np.array(all_preds)
         all_boxes = np.array(all_boxes)

@@ -186,6 +186,40 @@ class MultiViewConsistencyLoss(nn.Module):
         return loss
 
 
+class MultiViewProjectionLoss(nn.Module):
+    def __init__(self):
+        super(MultiViewProjectionLoss, self).__init__()
+        self.criterion = JointMPJPELoss()
+        self.human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
+                             (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
+        self.vis = [0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 12, 14, 15, 16, 17, 18, 19]
+
+    def forward(self, joints_3ds, target_weights):
+        loss = 0.0
+        for batch_root_joints_3d, batch_root_target_weight in zip(joints_3ds, target_weights):
+            for batch_joints_3d, batch_target_weight in zip(joints_3ds, target_weights):
+                '''
+                    for b in range(batch_root_joints_3d.shape[0]):
+                    root_joints_3d = batch_root_joints_3d[b]
+                    joints_3d = batch_joints_3d[b]
+                    root_target_weight = batch_root_target_weight[b]
+                    target_weight = batch_target_weight[b]
+
+                    target_weight = (target_weight * root_target_weight).view(-1)
+
+                    root_joints_3d = root_joints_3d[target_weight > 0, :]
+                    joints_3d = joints_3d[target_weight > 0, :]
+
+                    joints_3d_hat = compute_similarity_transform_torch(joints_3d, root_joints_3d)
+                    loss += self.criterion(joints_3d_hat, root_joints_3d)            
+                '''
+                #trans_kps_3d = criterion_procrustes(batch_joints_3d, batch_root_joints_3d)
+                for joints_3d, root_joints_3d in zip(batch_joints_3d, batch_root_joints_3d):
+                    loss += criterion_procrustes(joints_3d[self.vis, :], root_joints_3d[self.vis, :]) #self.criterion(trans_kps_3d, batch_root_joints_3d, batch_target_weight)
+
+        return loss
+
+
 class WeaklySupervisedLoss(nn.Module):
     def __init__(self, use_target_weight):
         super(WeaklySupervisedLoss, self).__init__()
@@ -194,8 +228,8 @@ class WeaklySupervisedLoss(nn.Module):
         self.criterion3 = MultiViewConsistencyLoss()
         self.mse = nn.MSELoss(reduction='mean')
         self.use_target_weight = use_target_weight
-        self.alpha = 0.01
-        self.beta = 0.1
+        self.alpha = 0.03
+        self.beta = 0.3
         self.pose_reconstructor = PoseReconstructor()
 
     def forward(self, hm_outputs, dm_outputs, targets, target_weights, cameras, limb):
