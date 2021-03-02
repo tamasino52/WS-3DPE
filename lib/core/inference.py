@@ -166,7 +166,7 @@ class PoseReconstructor(nn.Module):
         kps_25d_hat = _kps_25d_hat.clone()
         z_root = self.get_z_root(kps_25d_hat).repeat(1, 20)
         z_relative = kps_25d_hat[:, :, 2].clone()
-        kps_25d_hat[:, :, 2] = 1.0
+        kps_25d_hat[:, :, 2] = 1
         #K_inv = intrinsic_k.inverse().unsqueeze(1).repeat(1, 20, 1, 1)
         K = intrinsic_k.unsqueeze(1).repeat(1, 20, 1, 1)
         kps_3d_hat = (z_relative + z_root).view(-1, 1, 1) * K.view(-1, 3, 3).bmm(kps_25d_hat.view(-1, 3, 1))

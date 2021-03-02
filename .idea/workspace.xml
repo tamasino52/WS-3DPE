@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="bug fixed">
+    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="scale normalization bug fixed">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/core/function.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/function.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/inference.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/inference.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/loss.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/loss.py" afterDir="false" />
     </list>
@@ -386,7 +385,14 @@
       <option name="project" value="LOCAL" />
       <updated>1614435756792</updated>
     </task>
-    <option name="localTasksCounter" value="32" />
+    <task id="LOCAL-00032" summary="scale normalization bug fixed">
+      <created>1614686725730</created>
+      <option name="number" value="00032" />
+      <option name="presentableId" value="LOCAL-00032" />
+      <option name="project" value="LOCAL" />
+      <updated>1614686725730</updated>
+    </task>
+    <option name="localTasksCounter" value="33" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -418,7 +424,8 @@
     <MESSAGE value="Pose Reconstructor Module Added" />
     <MESSAGE value="Visualizer Module Added" />
     <MESSAGE value="bug fixed" />
-    <option name="LAST_COMMIT_MESSAGE" value="bug fixed" />
+    <MESSAGE value="scale normalization bug fixed" />
+    <option name="LAST_COMMIT_MESSAGE" value="scale normalization bug fixed" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -465,7 +472,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/lib/core/loss.py</url>
-          <line>189</line>
+          <line>182</line>
           <option name="timeStamp" value="417" />
         </line-breakpoint>
       </breakpoints>

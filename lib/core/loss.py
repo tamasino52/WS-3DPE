@@ -131,7 +131,8 @@ class LimbLengthLoss(nn.Module):
         self.p_key = 0
         self.c_key = 9
 
-    def get_limb_length(self, kps_3d):
+    def get_limb_length(self, _kps_3d):
+        kps_3d = _kps_3d.clone()
         s = self.get_scaling_factor(kps_3d)
         parent = kps_3d[:, [item[0] for item in self.human36_edge], :]
         child = kps_3d[:, [item[1] for item in self.human36_edge], :]
@@ -140,13 +141,6 @@ class LimbLengthLoss(nn.Module):
 
     def get_scaling_factor(self, kps_3d):
         return (((kps_3d[:, self.p_key, :] - kps_3d[:, self.c_key, :]) ** 2).sum(1) ** 0.5).view(-1, 1)
-
-    '''
-        def get_limb_weight(self, output_weight):
-        parent = torch.index_select(output_weight, 1, torch.cuda.LongTensor([item[0] for item in self.human36_edge]))
-        child = torch.index_select(output_weight, 1, torch.cuda.LongTensor([item[1] for item in self.human36_edge]))
-        return parent.mul(child)
-    '''
 
     def forward(self, joints_3d, avg_limb):
         loss = 0.0
@@ -183,7 +177,6 @@ class MultiViewConsistencyLoss(nn.Module):
                     joints_3d_hat = compute_similarity_transform_torch(joints_3d, root_joints_3d)
                     loss += self.criterion(joints_3d_hat, root_joints_3d)            
                 '''
-                #trans_kps_3d = criterion_procrustes(batch_joints_3d, batch_root_joints_3d)
                 for joints_3d, root_joints_3d in zip(batch_joints_3d, batch_root_joints_3d):
                     loss += criterion_procrustes(joints_3d[self.vis, :], root_joints_3d[self.vis, :]) #self.criterion(trans_kps_3d, batch_root_joints_3d, batch_target_weight)
 
@@ -217,10 +210,8 @@ class MultiViewProjectionLoss(nn.Module):
                     joints_3d_hat = compute_similarity_transform_torch(joints_3d, root_joints_3d)
                     loss += self.criterion(joints_3d_hat, root_joints_3d)            
                 '''
-                #trans_kps_3d = criterion_procrustes(batch_joints_3d, batch_root_joints_3d)
                 for joints_3d, root_joints_3d in zip(batch_joints_3d, batch_root_joints_3d):
-                    loss += criterion_procrustes(joints_3d[self.vis, :], root_joints_3d[self.vis, :]) #self.criterion(trans_kps_3d, batch_root_joints_3d, batch_target_weight)
-
+                    loss += criterion_procrustes(joints_3d[self.vis, :], root_joints_3d[self.vis, :])
         return loss
 
 
