@@ -128,14 +128,18 @@ class LimbLengthLoss(nn.Module):
         self.human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
                              (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
         self.criterion = nn.MSELoss(reduction='mean')
+        self.p_key = 0
+        self.c_key = 9
 
     def get_limb_length(self, kps_3d):
-        human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
-                        (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
-        parent = kps_3d[:, [item[0] for item in human36_edge], :]
-        child = kps_3d[:, [item[1] for item in human36_edge], :]
+        s = self.get_scaling_factor(kps_3d)
+        parent = kps_3d[:, [item[0] for item in self.human36_edge], :]
+        child = kps_3d[:, [item[1] for item in self.human36_edge], :]
         dist = (((parent - child) ** 2).sum(2) ** 0.5)
-        return dist
+        return dist / s
+
+    def get_scaling_factor(self, kps_3d):
+        return (((kps_3d[:, self.p_key, :] - kps_3d[:, self.c_key, :]) ** 2).sum(1) ** 0.5).view(-1, 1)
 
     '''
         def get_limb_weight(self, output_weight):
@@ -226,10 +230,9 @@ class WeaklySupervisedLoss(nn.Module):
         self.criterion1 = JointsMSELoss(use_target_weight)
         self.criterion2 = LimbLengthLoss()
         self.criterion3 = MultiViewConsistencyLoss()
-        self.mse = nn.MSELoss(reduction='mean')
         self.use_target_weight = use_target_weight
-        self.alpha = 0.03
-        self.beta = 0.3
+        self.alpha = 1.0
+        self.beta = 10.0
         self.pose_reconstructor = PoseReconstructor()
 
     def forward(self, hm_outputs, dm_outputs, targets, target_weights, cameras, limb):

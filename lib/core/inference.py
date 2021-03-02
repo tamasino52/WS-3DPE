@@ -87,7 +87,6 @@ class PoseReconstructor(nn.Module):
     def __init__(self):
         super(PoseReconstructor, self).__init__()
         self.soft_argmax = SoftArgmax2D(window_fn='Parzen')
-        self.pdist = nn.PairwiseDistance(p=2, keepdim=True)
         self.p_key = 0
         self.c_key = 9
 
@@ -95,9 +94,8 @@ class PoseReconstructor(nn.Module):
         kps_25d = self.get_kps_25d(hm, dm)
         s = self.get_scaling_factor(kps_25d)
         kps_25d_hat = self.get_scale_normalized_pose(kps_25d, s)
-        return kps_25d_hat
-        #kps_3d_hat = self.reconstruct_3d_kps(kps_25d_hat, cam)
-        #return kps_3d_hat
+        kps_3d_hat = self.reconstruct_3d_kps(kps_25d_hat, cam)
+        return kps_3d_hat
 
     def get_kps_25d(self, batch_heatmap, batch_depthmap):
         for h, d in zip(batch_heatmap.shape, batch_depthmap.shape):
@@ -118,7 +116,7 @@ class PoseReconstructor(nn.Module):
         Returns:
             Batch Scaling Factor s (Shape = [Batch, 1])
         """
-        return self.pdist(kps_25d[:, self.p_key, :], kps_25d[:, self.c_key, :])
+        return (((kps_25d[:, self.p_key, :] - kps_25d[:, self.c_key, :]) ** 2).sum(1) ** 0.5).view(-1, 1)
 
     def get_scale_normalized_pose(self, kps_25d, s):
         """
@@ -165,13 +163,13 @@ class PoseReconstructor(nn.Module):
         Returns:
             Batch 3D KeyPoints (Shape = [Batch, Joint, 3])
         """
-        z_root = self.get_z_root(_kps_25d_hat)
         kps_25d_hat = _kps_25d_hat.clone()
-        K_inv = intrinsic_k.inverse()
-        K_inv = K_inv.repeat(20, 1, 1)
-        kps_25d_hat[:, :, 2] = 1
-        kps_3d_hat = (z_root + kps_25d_hat[:, :, 2]).view(-1, 1, 1) * K_inv.bmm(kps_25d_hat.view(-1, 3, 1))
-
+        z_root = self.get_z_root(kps_25d_hat).repeat(1, 20)
+        z_relative = kps_25d_hat[:, :, 2].clone()
+        kps_25d_hat[:, :, 2] = 1.0
+        #K_inv = intrinsic_k.inverse().unsqueeze(1).repeat(1, 20, 1, 1)
+        K = intrinsic_k.unsqueeze(1).repeat(1, 20, 1, 1)
+        kps_3d_hat = (z_relative + z_root).view(-1, 1, 1) * K.view(-1, 3, 3).bmm(kps_25d_hat.view(-1, 3, 1))
         return kps_3d_hat.view(-1, 20, 3)
 
     def procrustes_transform(self, kps_3d_hat, gt_kps_3d_hat):
@@ -184,5 +182,4 @@ class PoseReconstructor(nn.Module):
         Returns:
             Batch 3D KeyPoints Aligned to GT  (Shape = [Batch, Joint, 3])
         """
-        trans_kps_3d_hat = batch_compute_similarity_transform_torch(kps_3d_hat, gt_kps_3d_hat)
-        return trans_kps_3d_hat
+        return batch_compute_similarity_transform_torch(kps_3d_hat, gt_kps_3d_hat)

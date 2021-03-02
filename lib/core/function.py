@@ -215,7 +215,6 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir, tb_l
             visualizer = PoseVisualizer()
             visualizer.save_batch_kps_3d(inputs, output_heatmaps, output_depthmaps, cameras, '{}_3d.jpg'.format(prefix))
 
-
         all_preds = np.array(all_preds)
         all_boxes = np.array(all_boxes)
         name_values, perf_indicator = val_dataset.evaluate(
