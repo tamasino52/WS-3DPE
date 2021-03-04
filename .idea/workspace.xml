@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="scale normalization bug fixed">
+    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="3D Reconstruction Module bug fix">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/core/inference.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/inference.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/utils/vis.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/utils/vis.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/h36m/generate_labels.py" beforeDir="false" afterPath="$PROJECT_DIR$/h36m/generate_labels.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -399,7 +398,14 @@
       <option name="project" value="LOCAL" />
       <updated>1614688552820</updated>
     </task>
-    <option name="localTasksCounter" value="34" />
+    <task id="LOCAL-00034" summary="3D Reconstruction Module bug fix">
+      <created>1614824545539</created>
+      <option name="number" value="00034" />
+      <option name="presentableId" value="LOCAL-00034" />
+      <option name="project" value="LOCAL" />
+      <updated>1614824545539</updated>
+    </task>
+    <option name="localTasksCounter" value="35" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -432,7 +438,8 @@
     <MESSAGE value="Visualizer Module Added" />
     <MESSAGE value="bug fixed" />
     <MESSAGE value="scale normalization bug fixed" />
-    <option name="LAST_COMMIT_MESSAGE" value="scale normalization bug fixed" />
+    <MESSAGE value="3D Reconstruction Module bug fix" />
+    <option name="LAST_COMMIT_MESSAGE" value="3D Reconstruction Module bug fix" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
