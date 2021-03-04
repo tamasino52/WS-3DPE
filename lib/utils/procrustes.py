@@ -47,7 +47,7 @@ def criterion_procrustes(data1, data2):
     # measure the dissimilarity between the two datasets
     disparity = torch.sum((mtx3 - mtx4) ** 2)
 
-    return disparity
+    return mtx3, mtx4, disparity
 
 
 def manual_procrustes(data1, data2):

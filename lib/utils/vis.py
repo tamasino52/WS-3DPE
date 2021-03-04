@@ -99,9 +99,9 @@ class PoseVisualizer(PoseReconstructor):
 
         data = zip(batch_image_list, batch_heatmap_list, batch_depthmap_list, camera_list)
         for view, (img, hm, dm, cam) in enumerate(data):
-            kps_3d = self.infer(hm, dm, cam)
+            kps_25d_hat = self.get_kps_25d_hat(hm, dm)
             if view is 0:
-                root_kps_3d = kps_3d
+                root_kps_25d_hat = kps_25d_hat
 
             for batch in range(batch_size):
                 image = img[batch]
@@ -113,8 +113,8 @@ class PoseVisualizer(PoseReconstructor):
                 image = self.normalize_img(image)
                 ax.imshow(image, vmin=0, vmax=255)
                 ax = fig.add_subplot(batch_size, 2 * view_size + 1, (batch * (2 * view_size + 1)) + 2 * view + 2, projection='3d')
-                self.draw_3d_plot(ax, kps_3d[batch].detach().cpu().numpy(), self.cmap[view])
-                kps_trans = procrustes_trans(kps_3d[batch], root_kps_3d[batch])
+                self.draw_3d_plot(ax, kps_25d_hat[batch].detach().cpu().numpy(), self.cmap[view])
+                kps_trans = procrustes_trans(kps_25d_hat[batch], root_kps_25d_hat[batch])
                 self.draw_3d_plot(ax_list[batch], kps_trans.detach().cpu().numpy(), self.cmap[view])
 
         plt.savefig(file_name)

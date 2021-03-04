@@ -90,12 +90,11 @@ class PoseReconstructor(nn.Module):
         self.p_key = 0
         self.c_key = 9
 
-    def infer(self, hm, dm, cam):
+    def get_kps_25d_hat(self, hm, dm):
         kps_25d = self.get_kps_25d(hm, dm)
         s = self.get_scaling_factor(kps_25d)
         kps_25d_hat = self.get_scale_normalized_pose(kps_25d, s)
-        kps_3d_hat = self.reconstruct_3d_kps(kps_25d_hat, cam)
-        return kps_3d_hat
+        return kps_25d_hat
 
     def get_kps_25d(self, batch_heatmap, batch_depthmap):
         for h, d in zip(batch_heatmap.shape, batch_depthmap.shape):
@@ -154,26 +153,14 @@ class PoseReconstructor(nn.Module):
 
         return z_root.view(-1, 1)
 
-    def calibrate_kps_2d(self, kps_2d, intrinsic_k):
-        K_inv = intrinsic_k.inverse().repeat(20, 1, 1)
+    def calibrate_kps_3d_hat(self, kps_2d, z_abs, intrinsic_k):
+        K_inv = intrinsic_k.inverse().repeat(20, 1, 1) * z_abs.view(-1, 1, 1)
         ones = torch.ones_like(kps_2d[:, :, 0]).unsqueeze(2)
-        kps_2d_hat = torch.cat([kps_2d[:, :, :2], ones], dim=2)
-        kps_2d_cal = K_inv.view(-1, 3, 3).bmm(kps_2d_hat.view(-1, 3, 1))
-        return (kps_2d_cal.view(-1, 20, 3))[:, :, :2]
+        kps_2d_hat = torch.cat([kps_2d, ones], dim=2)
+        kps_3d_hat = K_inv.view(-1, 3, 3).bmm(kps_2d_hat.view(-1, 3, 1))
+        return kps_3d_hat.view(-1, 20, 3)
 
-    def reconstruct(self, _pose2d, z, intrinsic_k):
-        pose2d = _pose2d.clone()
-        fx, fy = intrinsic_k[:, 0, 0], intrinsic_k[:, 1, 1]
-        cx, cy = intrinsic_k[:, 0, 2], intrinsic_k[:, 1, 2]
-        pose2d[:, :, 1] -= cy.view(-1, 1)
-        pose2d[:, :, 0] -= cx.view(-1, 1)
-        pose2d[:, :, 1] /= fy.view(-1, 1)
-        pose2d[:, :, 0] /= fx.view(-1, 1)
-        pose3d = torch.cat([pose2d, z], dim=2)
-        return pose3d
-
-
-    def reconstruct_3d_kps(self, _kps_25d_hat, intrinsic_k):
+    def get_global_kps_3d(self, _kps_25d_hat, intrinsic_k):
         """
         Args:
             _kps_25d_hat:
@@ -188,9 +175,7 @@ class PoseReconstructor(nn.Module):
         z_root = self.get_z_root(kps_25d_hat).repeat(1, 20)
         z_relative = kps_25d_hat[:, :, 2].clone()
         z_abs = (z_relative + z_root).unsqueeze(2)
-        kps_3d_hat = self.reconstruct(kps_25d_hat[:, :, :2], z_abs, intrinsic_k)
-        #kps_2d_hat = self.calibrate_kps_2d(kps_25d_hat[:, :, :2], intrinsic_k)
-        #kps_3d_hat = torch.cat([kps_2d_hat, z_relative.unsqueeze(2)], dim=2)
+        kps_3d_hat = self.calibrate_kps_3d_hat(kps_25d_hat[:, :, :2], z_abs, intrinsic_k)
         return kps_3d_hat
 
     def procrustes_transform(self, kps_3d_hat, gt_kps_3d_hat):

@@ -153,33 +153,20 @@ class LimbLengthLoss(nn.Module):
 class MultiViewConsistencyLoss(nn.Module):
     def __init__(self):
         super(MultiViewConsistencyLoss, self).__init__()
-        self.criterion = JointMPJPELoss()
+        self.criterion = nn.L1Loss()
         self.human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
                              (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
         self.vis = [0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 12, 14, 15, 16, 17, 18, 19]
 
     def forward(self, joints_3ds, target_weights):
         loss = 0.0
-        for batch_root_joints_3d, batch_root_target_weight in zip(joints_3ds, target_weights):
-            for batch_joints_3d, batch_target_weight in zip(joints_3ds, target_weights):
-                '''
-                    for b in range(batch_root_joints_3d.shape[0]):
-                    root_joints_3d = batch_root_joints_3d[b]
-                    joints_3d = batch_joints_3d[b]
-                    root_target_weight = batch_root_target_weight[b]
-                    target_weight = batch_target_weight[b]
-
-                    target_weight = (target_weight * root_target_weight).view(-1)
-
-                    root_joints_3d = root_joints_3d[target_weight > 0, :]
-                    joints_3d = joints_3d[target_weight > 0, :]
-
-                    joints_3d_hat = compute_similarity_transform_torch(joints_3d, root_joints_3d)
-                    loss += self.criterion(joints_3d_hat, root_joints_3d)            
-                '''
+        for idx1, (batch_root_joints_3d, batch_root_target_weight) in enumerate(zip(joints_3ds, target_weights)):
+            for idx2, (batch_joints_3d, batch_target_weight) in enumerate(zip(joints_3ds, target_weights)):
                 for joints_3d, root_joints_3d in zip(batch_joints_3d, batch_root_joints_3d):
-                    loss += criterion_procrustes(joints_3d[self.vis, :], root_joints_3d[self.vis, :]) #self.criterion(trans_kps_3d, batch_root_joints_3d, batch_target_weight)
-
+                    if idx1 is idx2:
+                        continue
+                    mtx1, mtx2, _ = criterion_procrustes(joints_3d[self.vis, :], root_joints_3d[self.vis, :])
+                    loss += self.criterion(mtx1, mtx2)
         return loss
 
 
@@ -236,8 +223,9 @@ class WeaklySupervisedLoss(nn.Module):
         data = zip(hm_outputs, dm_outputs, targets, target_weights, cameras)
         for heatmap, depthmap, target, target_weight, camera in data:
             joint_mse_loss += self.criterion1(heatmap, target, target_weight)
-            kps_3d_hat = self.pose_reconstructor.infer(heatmap, depthmap, camera)
-            limb_length_loss += self.criterion2(kps_3d_hat, limb)
+            kps_25d_hat = self.pose_reconstructor.get_kps_25d_hat(heatmap, depthmap)
+            kps_3d_hat = self.pose_reconstructor.get_global_kps_3d(kps_25d_hat, camera)
+            limb_length_loss += self.criterion2(kps_25d_hat, limb)
             kps_3d_hat_list.append(kps_3d_hat)
         multiview_consistency_loss += self.criterion3(kps_3d_hat_list, target_weights)
         total_loss = joint_mse_loss + self.beta * limb_length_loss + self.alpha * multiview_consistency_loss
