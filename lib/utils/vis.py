@@ -16,6 +16,7 @@ import matplotlib
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 import torch
 import torch.nn as nn
@@ -69,15 +70,6 @@ class PoseVisualizer(PoseReconstructor):
 
         ax.scatter(kps_3d[i1, 0], kps_3d[i1, 2], -kps_3d[i1, 1], marker='o', color=color)
         ax.scatter(kps_3d[i2, 0], kps_3d[i2, 2], -kps_3d[i2, 1], marker='o', color=color)
-        '''
-        max_range = np.array([x.max() - x.min(), y.max() - y.min(), z.max() - z.min()]).max()
-        Xb = 0.5 * max_range * np.mgrid[-1:2:2, -1:2:2, -1:2:2][0].flatten() + 0.5 * (x.max() + x.min())
-        Yb = 0.5 * max_range * np.mgrid[-1:2:2, -1:2:2, -1:2:2][1].flatten() + 0.5 * (y.max() + y.min())
-        Zb = 0.5 * max_range * np.mgrid[-1:2:2, -1:2:2, -1:2:2][2].flatten() + 0.5 * (z.max() + z.min())
-        # Comment or uncomment following both lines to test the fake bounding box:
-        for xb, yb, zb in zip(Xb, Yb, Zb):
-            ax.plot([xb], [yb], [zb], 'w')
-        '''
 
         ax.set_xlabel('X')
         ax.set_ylabel('Z')

@@ -107,15 +107,16 @@ class PoseReconstructor(nn.Module):
         heatmap_index = self.soft_argmax(batch_heatmap)
         return torch.cat([heatmap_index, depth], dim=2)
 
-    def get_scaling_factor(self, kps_25d):
+    def get_scaling_factor(self, _kps_25d):
         """
         We use the mean distance between joints to calculate the scaling factor s.
         Args:
-            kps_25d:
+            _kps_25d:
                 Batch 2.5D KeyPoints (Shape = [Batch, Joint, 3])
         Returns:
             Batch Scaling Factor s (Shape = [Batch, 1])
         """
+        kps_25d = _kps_25d.clone()
         return (((kps_25d[:, self.p_key, :] - kps_25d[:, self.c_key, :]) ** 2).sum(1) ** 0.5).view(-1, 1)
 
     def get_scale_normalized_pose(self, kps_25d, s):
@@ -153,24 +154,44 @@ class PoseReconstructor(nn.Module):
 
         return z_root.view(-1, 1)
 
+    def calibrate_kps_2d(self, kps_2d, intrinsic_k):
+        K_inv = intrinsic_k.inverse().repeat(20, 1, 1)
+        ones = torch.ones_like(kps_2d[:, :, 0]).unsqueeze(2)
+        kps_2d_hat = torch.cat([kps_2d[:, :, :2], ones], dim=2)
+        kps_2d_cal = K_inv.view(-1, 3, 3).bmm(kps_2d_hat.view(-1, 3, 1))
+        return (kps_2d_cal.view(-1, 20, 3))[:, :, :2]
+
+    def reconstruct(self, _pose2d, z, intrinsic_k):
+        pose2d = _pose2d.clone()
+        fx, fy = intrinsic_k[:, 0, 0], intrinsic_k[:, 1, 1]
+        cx, cy = intrinsic_k[:, 0, 2], intrinsic_k[:, 1, 2]
+        pose2d[:, :, 1] -= cy.view(-1, 1)
+        pose2d[:, :, 0] -= cx.view(-1, 1)
+        pose2d[:, :, 1] /= fy.view(-1, 1)
+        pose2d[:, :, 0] /= fx.view(-1, 1)
+        pose3d = torch.cat([pose2d, z], dim=2)
+        return pose3d
+
+
     def reconstruct_3d_kps(self, _kps_25d_hat, intrinsic_k):
         """
         Args:
             _kps_25d_hat:
                 Batch Scale Normalized 2.5D KeyPoints (Shape = [Batch, Joint, 3] // X, Y, Relative Z)
             intrinsic_k:
-                Intrinsic Camera Matrix Batch * [[fx, 0, cx], [0, fy, cy], [0, 0, 1]]
+                Intrinsic Camera Matrix Batch * 3 * 3 // [[fx, 0, cx], [0, fy, cy], [0, 0, 1]]
         Returns:
             Batch 3D KeyPoints (Shape = [Batch, Joint, 3])
         """
+
         kps_25d_hat = _kps_25d_hat.clone()
         z_root = self.get_z_root(kps_25d_hat).repeat(1, 20)
         z_relative = kps_25d_hat[:, :, 2].clone()
-        kps_25d_hat[:, :, 2] = 1
-        #K_inv = intrinsic_k.inverse().unsqueeze(1).repeat(1, 20, 1, 1)
-        K = intrinsic_k.unsqueeze(1).repeat(1, 20, 1, 1)
-        kps_3d_hat = (z_relative + z_root).view(-1, 1, 1) * K.view(-1, 3, 3).bmm(kps_25d_hat.view(-1, 3, 1))
-        return kps_3d_hat.view(-1, 20, 3)
+        z_abs = (z_relative + z_root).unsqueeze(2)
+        kps_3d_hat = self.reconstruct(kps_25d_hat[:, :, :2], z_abs, intrinsic_k)
+        #kps_2d_hat = self.calibrate_kps_2d(kps_25d_hat[:, :, :2], intrinsic_k)
+        #kps_3d_hat = torch.cat([kps_2d_hat, z_relative.unsqueeze(2)], dim=2)
+        return kps_3d_hat
 
     def procrustes_transform(self, kps_3d_hat, gt_kps_3d_hat):
         """
