@@ -59,6 +59,7 @@ class PoseVisualizer(PoseReconstructor):
         return image
 
     def draw_3d_plot(self, ax, kps_3d, color='r'):
+        #mean_x , mean_y, mean_z =
         i1 = [self.union_pair[idx][0] for idx in range(len(self.union_pair))]
         i2 = [self.union_pair[idx][1] for idx in range(len(self.union_pair))]
 

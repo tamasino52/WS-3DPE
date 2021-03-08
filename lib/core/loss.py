@@ -127,7 +127,6 @@ class LimbLengthLoss(nn.Module):
         super(LimbLengthLoss, self).__init__()
         self.human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
                              (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
-        self.criterion = nn.MSELoss(reduction='mean')
         self.p_key = 0
         self.c_key = 9
 
@@ -146,7 +145,7 @@ class LimbLengthLoss(nn.Module):
         loss = 0.0
         length_gt = avg_limb.clone()
         length_pred = self.get_limb_length(joints_3d)
-        loss += self.criterion(length_gt, length_pred)
+        loss += ((length_gt - length_pred) ** 2).sum()
         return loss
 
 
@@ -158,48 +157,53 @@ class MultiViewConsistencyLoss(nn.Module):
                              (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
         self.vis = [0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 12, 14, 15, 16, 17, 18, 19]
 
-    def forward(self, joints_3ds, target_weights):
+    def forward(self, kps_3d_list, confidence_list):
         loss = 0.0
-        for idx1, (batch_root_joints_3d, batch_root_target_weight) in enumerate(zip(joints_3ds, target_weights)):
-            for idx2, (batch_joints_3d, batch_target_weight) in enumerate(zip(joints_3ds, target_weights)):
-                for joints_3d, root_joints_3d in zip(batch_joints_3d, batch_root_joints_3d):
-                    if idx1 is idx2:
-                        continue
-                    mtx1, mtx2, _ = criterion_procrustes(joints_3d[self.vis, :], root_joints_3d[self.vis, :])
-                    loss += self.criterion(mtx1, mtx2)
+        for idx1, (root_kps_3d, root_confidence) in enumerate(zip(kps_3d_list, confidence_list)):
+            for idx2, (kps_3d, confidence) in enumerate(zip(kps_3d_list, confidence_list)):
+                if idx1 is not idx2:
+                    '''
+                    for joints_3d, root_joints_3d in zip(batch_joints_3d, batch_root_joints_3d):
+                        if idx1 is idx2:
+                            continue
+                        mtx1, mtx2, _ = criterion_procrustes(joints_3d[self.vis, :], root_joints_3d[self.vis, :])
+                        loss += self.criterion(mtx1, mtx2)
+                    '''
+                    procrustes = ProcrustesTransformation(root_kps_3d.shape[0], root_kps_3d, root_confidence, confidence)
+                    procrustes = procrustes.cuda()
+                    optimizer = torch.optim.Adam(params=procrustes.parameters(), lr=0.1)
+                    trans_loss = 0.0
+                    for _ in range(50):
+                        trans_kps_3d = procrustes(kps_3d)
+                        trans_loss += procrustes.criterion(trans_kps_3d)
+
+                        optimizer.zero_grad()
+                        trans_loss.backward()
+                        optimizer.step()
+                    loss += self.criterion(root_kps_3d, trans_kps_3d)
         return loss
 
 
-class MultiViewProjectionLoss(nn.Module):
-    def __init__(self):
-        super(MultiViewProjectionLoss, self).__init__()
-        self.criterion = JointMPJPELoss()
-        self.human36_edge = [(0, 7), (7, 9), (9, 11), (11, 12), (9, 14), (14, 15), (15, 16), (9, 17), (17, 18),
-                             (18, 19), (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6)]
-        self.vis = [0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 12, 14, 15, 16, 17, 18, 19]
+class ProcrustesTransformation(nn.Module):
+    def __init__(self, batch, root_p, root_c, c):
+        super(ProcrustesTransformation, self).__init__()
+        self.batch = batch
+        self.root_p = root_p
+        self.root_c = root_c
+        self.c = c
+        self.R = torch.nn.Parameter(data=torch.zeros(self.batch, 3, 3), requires_grad=True)
+        self.t = torch.nn.Parameter(data=torch.zeros(self.batch, 3, 1), requires_grad=True)
 
-    def forward(self, joints_3ds, target_weights):
-        loss = 0.0
-        for batch_root_joints_3d, batch_root_target_weight in zip(joints_3ds, target_weights):
-            for batch_joints_3d, batch_target_weight in zip(joints_3ds, target_weights):
-                '''
-                    for b in range(batch_root_joints_3d.shape[0]):
-                    root_joints_3d = batch_root_joints_3d[b]
-                    joints_3d = batch_joints_3d[b]
-                    root_target_weight = batch_root_target_weight[b]
-                    target_weight = batch_target_weight[b]
+    def criterion(self, Rp):
+        dist = (self.root_c * self.c).view(-1, 20) * ((self.root_p - Rp).sum(2) ** 2)
+        return dist.sum()
 
-                    target_weight = (target_weight * root_target_weight).view(-1)
-
-                    root_joints_3d = root_joints_3d[target_weight > 0, :]
-                    joints_3d = joints_3d[target_weight > 0, :]
-
-                    joints_3d_hat = compute_similarity_transform_torch(joints_3d, root_joints_3d)
-                    loss += self.criterion(joints_3d_hat, root_joints_3d)            
-                '''
-                for joints_3d, root_joints_3d in zip(batch_joints_3d, batch_root_joints_3d):
-                    loss += criterion_procrustes(joints_3d[self.vis, :], root_joints_3d[self.vis, :])
-        return loss
+    def forward(self, x):
+        x = x.view(-1, 3, 1)  # 180 3 1
+        R = self.R.repeat(20, 1, 1)  # 180 3 3
+        t = self.t.repeat(20, 1, 1)  # 180 3 1
+        Rp = R.bmm(x) + t
+        return Rp.view(-1, 20, 3)
 
 
 class WeaklySupervisedLoss(nn.Module):
@@ -209,8 +213,8 @@ class WeaklySupervisedLoss(nn.Module):
         self.criterion2 = LimbLengthLoss()
         self.criterion3 = MultiViewConsistencyLoss()
         self.use_target_weight = use_target_weight
-        self.alpha = 1.0
-        self.beta = 10.0
+        self.alpha = 10.0
+        self.beta = 100.0
         self.pose_reconstructor = PoseReconstructor()
 
     def forward(self, hm_outputs, dm_outputs, targets, target_weights, cameras, limb):

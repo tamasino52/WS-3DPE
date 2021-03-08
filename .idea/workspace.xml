@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="3D Reconstruction Module bug fix">
+    <list default="true" id="1db817a8-e4dd-4317-a183-598c244bbe48" name="디폴트 변경 목록" comment="Multi-View Consistency Loss Module Modified">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/core/inference.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/inference.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/loss.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/loss.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/utils/procrustes.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/utils/procrustes.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/utils/vis.py" beforeDir="false" afterPath="$PROJECT_DIR$/lib/utils/vis.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -415,7 +413,14 @@
       <option name="project" value="LOCAL" />
       <updated>1614868972938</updated>
     </task>
-    <option name="localTasksCounter" value="36" />
+    <task id="LOCAL-00036" summary="Multi-View Consistency Loss Module Modified">
+      <created>1614880720573</created>
+      <option name="number" value="00036" />
+      <option name="presentableId" value="LOCAL-00036" />
+      <option name="project" value="LOCAL" />
+      <updated>1614880720573</updated>
+    </task>
+    <option name="localTasksCounter" value="37" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -449,7 +454,8 @@
     <MESSAGE value="bug fixed" />
     <MESSAGE value="scale normalization bug fixed" />
     <MESSAGE value="3D Reconstruction Module bug fix" />
-    <option name="LAST_COMMIT_MESSAGE" value="3D Reconstruction Module bug fix" />
+    <MESSAGE value="Multi-View Consistency Loss Module Modified" />
+    <option name="LAST_COMMIT_MESSAGE" value="Multi-View Consistency Loss Module Modified" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -493,6 +499,16 @@
           <url>file://$PROJECT_DIR$/lib/utils/vis.py</url>
           <line>6</line>
           <option name="timeStamp" value="392" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/lib/utils/vis.py</url>
+          <line>62</line>
+          <option name="timeStamp" value="435" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/lib/core/loss.py</url>
+          <line>197</line>
+          <option name="timeStamp" value="438" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>
